@@ -111,12 +111,26 @@ static GLuint vtx_program = 0;
 // Extra helper to reconstruct buffers on mesh change
 static void kr_mesh_rebuild_buffers();
 
+static std::vector<unsigned int> g_indices;
+
 static void kr_mesh_rebuild_buffers() {
     glBindBuffer(GL_ARRAY_BUFFER, cube_vbo);
     glBufferData(GL_ARRAY_BUFFER, mesh.vertices.size() * sizeof(KrVertex), mesh.vertices.data(), GL_STATIC_DRAW);
 
+    g_indices.clear();
+    for (const auto& f : mesh.faces) {
+        g_indices.push_back(f.v0);
+        g_indices.push_back(f.v1);
+        g_indices.push_back(f.v2);
+        if (f.is_quad()) {
+            g_indices.push_back(f.v0);
+            g_indices.push_back(f.v2);
+            g_indices.push_back(f.v3);
+        }
+    }
+
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, cube_ebo);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, mesh.faces.size() * sizeof(KrFace), mesh.faces.data(), GL_STATIC_DRAW);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, g_indices.size() * sizeof(unsigned int), g_indices.data(), GL_STATIC_DRAW);
 }
 
 extern "C" JNIEXPORT void JNICALL
@@ -139,13 +153,7 @@ Java_com_kronos3d_GLSurfaceManager_nativeInit(JNIEnv* env, jobject obj) {
 
     glBindVertexArray(cube_vao);
 
-    // Bind VBO
-    glBindBuffer(GL_ARRAY_BUFFER, cube_vbo);
-    glBufferData(GL_ARRAY_BUFFER, mesh.vertices.size() * sizeof(KrVertex), mesh.vertices.data(), GL_STATIC_DRAW);
-
-    // Bind EBO
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, cube_ebo);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, mesh.faces.size() * sizeof(KrFace), mesh.faces.data(), GL_STATIC_DRAW);
+    kr_mesh_rebuild_buffers();
 
     // Position attribute
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(KrVertex), (void*)0);
@@ -209,7 +217,7 @@ Java_com_kronos3d_GLSurfaceManager_nativeRender(JNIEnv* env, jobject obj) {
     glUniform3f(cam_pos_loc, camera_pos.x, camera_pos.y, camera_pos.z);
 
     glBindVertexArray(cube_vao);
-    glDrawElements(GL_TRIANGLES, mesh.faces.size() * 3, GL_UNSIGNED_INT, 0);
+    glDrawElements(GL_TRIANGLES, g_indices.size(), GL_UNSIGNED_INT, 0);
     glBindVertexArray(0);
 
     // Draw Selected Face highlight if applicable
@@ -223,7 +231,14 @@ Java_com_kronos3d_GLSurfaceManager_nativeRender(JNIEnv* env, jobject obj) {
 
         glBindVertexArray(cube_vao);
         // Render only the selected face indices
-        glDrawElements(GL_TRIANGLES, 3, GL_UNSIGNED_INT, (void*)(selected_face_id * 3 * sizeof(unsigned int)));
+        int idx_offset = 0;
+        int count = 0;
+        for (int i = 0; i < selected_face_id; ++i) {
+            idx_offset += mesh.faces[i].is_quad() ? 6 : 3;
+        }
+        count = mesh.faces[selected_face_id].is_quad() ? 6 : 3;
+        
+        glDrawElements(GL_TRIANGLES, count, GL_UNSIGNED_INT, (void*)(idx_offset * sizeof(unsigned int)));
         glBindVertexArray(0);
     }
 
@@ -238,9 +253,13 @@ Java_com_kronos3d_GLSurfaceManager_nativeRender(JNIEnv* env, jobject obj) {
 
         // 1. Draw Edges as wireframe lines (White)
         glUniform4f(overlay_color_loc, 1.0f, 1.0f, 1.0f, 0.8f);
-        // Draw using line loop or line strips of the triangles
+        // Draw using line loop
+        int wire_idx_offset = 0;
         for (size_t i = 0; i < mesh.faces.size(); ++i) {
-            glDrawElements(GL_LINE_LOOP, 3, GL_UNSIGNED_INT, (void*)(i * 3 * sizeof(unsigned int)));
+            int count = mesh.faces[i].is_quad() ? 6 : 3;
+            // Draw as triangles in wireframe mode: this isn't perfect (shows quad diagonal) but works safely
+            glDrawElements(GL_LINE_LOOP, count, GL_UNSIGNED_INT, (void*)(wire_idx_offset * sizeof(unsigned int)));
+            wire_idx_offset += count;
         }
 
         // 2. Draw Vertices as white points (White)

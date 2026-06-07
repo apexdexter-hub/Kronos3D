@@ -41,11 +41,10 @@ KrMesh kr_mesh_create_cube() {
     mesh.vertices.push_back({-0.5f,  0.5f,  0.5f, -1.0f,  0.0f,  0.0f});
     mesh.vertices.push_back({-0.5f,  0.5f, -0.5f, -1.0f,  0.0f,  0.0f});
 
-    // Add indices (2 triangles per face)
+    // Add indices (1 quad per face)
     for (unsigned int i = 0; i < 6; ++i) {
         unsigned int offset = i * 4;
-        mesh.faces.push_back({offset + 0, offset + 1, offset + 2});
-        mesh.faces.push_back({offset + 0, offset + 2, offset + 3});
+        mesh.faces.push_back({offset + 0, offset + 1, offset + 2, offset + 3});
     }
 
     return mesh;

@@ -63,7 +63,14 @@ int kr_mesh_raycast(
         glm::vec3 v2 = glm::vec3(model * glm::vec4(mesh.vertices[f.v2].x, mesh.vertices[f.v2].y, mesh.vertices[f.v2].z, 1.0f));
 
         float t = 0.0f;
-        if (ray_triangle_intersect(ray_origin, ray_dir, v0, v1, v2, t)) {
+        bool hit = ray_triangle_intersect(ray_origin, ray_dir, v0, v1, v2, t);
+        
+        if (!hit && f.is_quad()) {
+            glm::vec3 v3 = glm::vec3(model * glm::vec4(mesh.vertices[f.v3].x, mesh.vertices[f.v3].y, mesh.vertices[f.v3].z, 1.0f));
+            hit = ray_triangle_intersect(ray_origin, ray_dir, v0, v2, v3, t);
+        }
+
+        if (hit) {
             if (t < min_t) {
                 min_t = t;
                 hit_face_idx = (int)i;

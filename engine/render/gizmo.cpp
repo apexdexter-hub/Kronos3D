@@ -27,6 +27,10 @@ glm::vec3 kr_gizmo_get_selection_center(const KrMesh& mesh, int selected_vertex_
         glm::vec3 v0(mesh.vertices[f.v0].x, mesh.vertices[f.v0].y, mesh.vertices[f.v0].z);
         glm::vec3 v1(mesh.vertices[f.v1].x, mesh.vertices[f.v1].y, mesh.vertices[f.v1].z);
         glm::vec3 v2(mesh.vertices[f.v2].x, mesh.vertices[f.v2].y, mesh.vertices[f.v2].z);
+        if (f.is_quad()) {
+            glm::vec3 v3(mesh.vertices[f.v3].x, mesh.vertices[f.v3].y, mesh.vertices[f.v3].z);
+            return (v0 + v1 + v2 + v3) / 4.0f;
+        }
         return (v0 + v1 + v2) / 3.0f;
     }
     return glm::vec3(0.0f);
@@ -150,11 +154,19 @@ bool kr_gizmo_drag(KrMesh& mesh, int selected_vertex_id, int selected_face_id, K
             glm::vec3 target_pos_v0(mesh.vertices[f.v0].x, mesh.vertices[f.v0].y, mesh.vertices[f.v0].z);
             glm::vec3 target_pos_v1(mesh.vertices[f.v1].x, mesh.vertices[f.v1].y, mesh.vertices[f.v1].z);
             glm::vec3 target_pos_v2(mesh.vertices[f.v2].x, mesh.vertices[f.v2].y, mesh.vertices[f.v2].z);
+            glm::vec3 target_pos_v3(0.0f);
+            if (f.is_quad()) target_pos_v3 = glm::vec3(mesh.vertices[f.v3].x, mesh.vertices[f.v3].y, mesh.vertices[f.v3].z);
+            
             for (auto& v : mesh.vertices) {
                 glm::vec3 curr(v.x, v.y, v.z);
-                if (glm::distance(curr, target_pos_v0) < 0.0001f ||
-                    glm::distance(curr, target_pos_v1) < 0.0001f ||
-                    glm::distance(curr, target_pos_v2) < 0.0001f) {
+                bool match = (glm::distance(curr, target_pos_v0) < 0.0001f ||
+                              glm::distance(curr, target_pos_v1) < 0.0001f ||
+                              glm::distance(curr, target_pos_v2) < 0.0001f);
+                if (!match && f.is_quad() && glm::distance(curr, target_pos_v3) < 0.0001f) {
+                    match = true;
+                }
+                
+                if (match) {
                     v.x += delta.x;
                     v.y += delta.y;
                     v.z += delta.z;

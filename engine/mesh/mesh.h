@@ -9,7 +9,8 @@ struct KrVertex {
 };
 
 struct KrFace {
-    unsigned int v0, v1, v2;
+    unsigned int v0, v1, v2, v3;
+    bool is_quad() const { return v3 != (unsigned int)-1; }
 };
 
 struct KrMesh {
