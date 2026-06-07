@@ -14,6 +14,7 @@ class GLSurfaceManager : GLSurfaceView.Renderer {
 
     override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
         nativeInit()
+        nativeLoadMesh()
     }
 
     override fun onSurfaceChanged(gl: GL10?, width: Int, height: Int) {
@@ -44,4 +45,8 @@ class GLSurfaceManager : GLSurfaceView.Renderer {
     external fun nativeGetFPS(): Float
     external fun nativeGetVertCount(): Int
     external fun nativeGetFaceCount(): Int
+    external fun nativeSaveMesh()
+    external fun nativeLoadMesh()
+    external fun nativeGizmoDown(x: Float, y: Float)
+    external fun nativeGizmoUp()
 }

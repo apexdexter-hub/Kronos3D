@@ -41,6 +41,7 @@ add_library(kronos3d_engine SHARED
     engine/render/viewport.cpp
     engine/render/shader.cpp
     engine/render/overlay.cpp
+    engine/render/gizmo.cpp
 )
 
 # Link log, android, and openGL GLESv3 libraries

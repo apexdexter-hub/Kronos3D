@@ -83,6 +83,9 @@ class MainActivity : Activity() {
 
     override fun onPause() {
         super.onPause()
+        glView?.queueEvent {
+            glView?.renderer?.nativeSaveMesh()
+        }
         glView?.onPause()
         updateRunnable?.let { handler.removeCallbacks(it) }
     }

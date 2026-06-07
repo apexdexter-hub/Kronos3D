@@ -56,12 +56,9 @@ void kr_mesh_subdivide_face(KrMesh& mesh, int face_id) {
     mesh.vertices.push_back(center);
 
     // Replace original face with 3 subdivide faces
-    mesh.faces[face_id] = { f.v0, idx_edge01, idx_center };
-    mesh.faces.push_back({ idx_edge01, f.v1, idx_center });
-    mesh.faces.push_back({ f.v1, idx_edge12, idx_center });
-    mesh.faces.push_back({ idx_edge12, f.v2, idx_center });
-    mesh.faces.push_back({ f.v2, idx_edge20, idx_center });
-    mesh.faces.push_back({ idx_edge20, f.v0, idx_center });
+    mesh.faces[face_id] = { f.v0, f.v1, idx_center };
+    mesh.faces.push_back({ f.v1, f.v2, idx_center });
+    mesh.faces.push_back({ f.v2, f.v0, idx_center });
 }
 
 // Extrude face operator

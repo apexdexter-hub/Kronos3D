@@ -15,6 +15,12 @@ KEYSTORE="$HOME/kronos3d-dev.keystore"
 APK_UNSIGNED="$SCRIPT_DIR/app/build/outputs/apk/debug/app-debug.apk"
 APK_SIGNED="$OUTPUT_DIR/Kronos3D-${VERSION}.apk"
 
+./gradlew clean 2>/dev/null
+rm -rf app/build 2>/dev/null
+rm -rf /home/codespace/.gradle/caches/8.9/transforms/ 2>/dev/null
+./gradlew --stop 2>/dev/null
+echo "🧹 Cache limpiado"
+
 echo "📁 Output dir: $OUTPUT_DIR"
 mkdir -p "$OUTPUT_DIR"
 

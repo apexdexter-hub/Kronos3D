@@ -38,6 +38,9 @@ class KronosGLSurfaceView(context: Context) : GLSurfaceView(context) {
                 prevX = x
                 prevY = y
                 downTime = System.currentTimeMillis()
+                queueEvent {
+                    renderer.nativeGizmoDown(x, y)
+                }
             }
             MotionEvent.ACTION_UP -> {
                 val duration = System.currentTimeMillis() - downTime
@@ -46,6 +49,9 @@ class KronosGLSurfaceView(context: Context) : GLSurfaceView(context) {
                     queueEvent {
                         renderer.nativeTap(x, y)
                     }
+                }
+                queueEvent {
+                    renderer.nativeGizmoUp()
                 }
             }
             MotionEvent.ACTION_MOVE -> {

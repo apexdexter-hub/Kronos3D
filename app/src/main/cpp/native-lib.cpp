@@ -7,14 +7,17 @@
 #include <chrono>
 #include <cmath>
 #include <thread>
+#include <fstream>
 
 #include "engine/mesh/mesh.h"
 #include "engine/render/viewport.h"
 #include "engine/render/shader.h"
 #include "engine/render/overlay.h"
+#include "engine/render/gizmo.h"
 
 #define LOG_TAG "Kronos3D_Bridge"
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
+#define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
 
 // Shaders sources inline
 const char* mesh_vert_src = R"(#version 300 es
@@ -253,6 +256,11 @@ Java_com_kronos3d_GLSurfaceManager_nativeRender(JNIEnv* env, jobject obj) {
         glBindVertexArray(0);
     }
 
+    // Render 3D Translation Gizmo if we have selection
+    if (selected_face_id != -1 || selected_vertex_id != -1) {
+        kr_gizmo_render(mesh, selected_vertex_id, selected_face_id, current_edit_mode, mvp, overlay_program);
+    }
+
     // Limit to 60 FPS maximum
     const auto targetFrameTime = std::chrono::milliseconds(16);
     auto frameEnd = frame_start + targetFrameTime;
@@ -261,14 +269,18 @@ Java_com_kronos3d_GLSurfaceManager_nativeRender(JNIEnv* env, jobject obj) {
 
 extern "C" JNIEXPORT void JNICALL
 Java_com_kronos3d_GLSurfaceManager_nativeOrbit(JNIEnv* env, jobject obj, jfloat dx, jfloat dy) {
-    if (current_tool_mode == TOOL_MOVE && current_edit_mode == EDIT_MODE && selected_vertex_id != -1) {
-        // Drag active selected vertex on horizontal XZ plane using dx and dy screen movement
-        float scale = 0.005f * camera.distance;
-        kr_mesh_move_vertex(mesh, selected_vertex_id, dx * scale, dy * scale);
-        kr_mesh_rebuild_buffers();
-    } else {
-        // Touch drag sensitivity: orbit camera
-        kr_camera_orbit(camera, dx * 0.15f, dy * 0.15f);
+    // Attempt dragging via Gizmo translation first
+    bool dragged = kr_gizmo_drag(mesh, selected_vertex_id, selected_face_id, current_edit_mode, dx, dy, screen_width, screen_height, camera.distance, camera.azimuth, camera.elevation);
+    if (!dragged) {
+        if (current_tool_mode == TOOL_MOVE && current_edit_mode == EDIT_MODE && selected_vertex_id != -1) {
+            // Fallback: Drag active selected vertex on horizontal XZ plane using dx and dy screen movement
+            float scale = 0.005f * camera.distance;
+            kr_mesh_move_vertex(mesh, selected_vertex_id, dx * scale, dy * scale);
+            kr_mesh_rebuild_buffers();
+        } else {
+            // Touch drag sensitivity: orbit camera
+            kr_camera_orbit(camera, dx * 0.15f, dy * 0.15f);
+        }
     }
 }
 
@@ -397,4 +409,77 @@ Java_com_kronos3d_GLSurfaceManager_nativeGetVertCount(JNIEnv* env, jobject obj) 
 extern "C" JNIEXPORT jint JNICALL
 Java_com_kronos3d_GLSurfaceManager_nativeGetFaceCount(JNIEnv* env, jobject obj) {
     return (jint)mesh.faces.size();
+}
+
+const char* autosave_path = "/data/data/com.kronos3d/files/autosave.mesh";
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_kronos3d_GLSurfaceManager_nativeSaveMesh(JNIEnv* env, jobject obj) {
+    LOGI("Saving mesh to %s", autosave_path);
+    std::ofstream out(autosave_path, std::ios::binary);
+    if (!out) {
+        LOGE("Failed to open autosave file for writing");
+        return;
+    }
+    
+    size_t vert_count = mesh.vertices.size();
+    out.write(reinterpret_cast<const char*>(&vert_count), sizeof(vert_count));
+    out.write(reinterpret_cast<const char*>(mesh.vertices.data()), vert_count * sizeof(KrVertex));
+    
+    size_t face_count = mesh.faces.size();
+    out.write(reinterpret_cast<const char*>(&face_count), sizeof(face_count));
+    out.write(reinterpret_cast<const char*>(mesh.faces.data()), face_count * sizeof(KrFace));
+    
+    out.close();
+    LOGI("Mesh saved successfully");
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_kronos3d_GLSurfaceManager_nativeLoadMesh(JNIEnv* env, jobject obj) {
+    LOGI("Loading mesh from %s", autosave_path);
+    std::ifstream in(autosave_path, std::ios::binary);
+    if (!in) {
+        LOGI("No autosave file found, starting with default cube");
+        return;
+    }
+    
+    size_t vert_count = 0;
+    in.read(reinterpret_cast<char*>(&vert_count), sizeof(vert_count));
+    if (vert_count == 0) return;
+    mesh.vertices.resize(vert_count);
+    in.read(reinterpret_cast<char*>(mesh.vertices.data()), vert_count * sizeof(KrVertex));
+    
+    size_t face_count = 0;
+    in.read(reinterpret_cast<char*>(&face_count), sizeof(face_count));
+    if (face_count == 0) return;
+    mesh.faces.resize(face_count);
+    in.read(reinterpret_cast<char*>(mesh.faces.data()), face_count * sizeof(KrFace));
+    
+    in.close();
+    LOGI("Mesh loaded successfully");
+    
+    // Rebuild GPU buffers
+    kr_mesh_rebuild_buffers();
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_kronos3d_GLSurfaceManager_nativeGizmoDown(JNIEnv* env, jobject obj, jfloat pixel_x, jfloat pixel_y) {
+    float aspect = (float)screen_width / (float)screen_height;
+    glm::mat4 projection = glm::perspective(glm::radians(45.0f), aspect, 0.1f, 100.0f);
+    float rad_az = glm::radians(camera.azimuth);
+    float rad_el = glm::radians(camera.elevation);
+    glm::vec3 camera_pos;
+    camera_pos.x = camera.distance * cos(rad_el) * sin(rad_az);
+    camera_pos.y = camera.distance * sin(rad_el);
+    camera_pos.z = camera.distance * cos(rad_el) * cos(rad_az);
+    glm::mat4 view = glm::lookAt(camera_pos, glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+    glm::mat4 model = glm::mat4(1.0f);
+    glm::mat4 mvp = projection * view * model;
+
+    kr_gizmo_down(mesh, selected_vertex_id, selected_face_id, current_edit_mode, pixel_x, pixel_y, screen_width, screen_height, mvp, camera.distance, camera.azimuth, camera.elevation);
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_kronos3d_GLSurfaceManager_nativeGizmoUp(JNIEnv* env, jobject obj) {
+    g_active_gizmo_axis = -1;
 }
