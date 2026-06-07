@@ -17,6 +17,8 @@ class ToolbarManager(private val context: Context, private val glView: KronosGLS
     private var editButton: Button? = null
     private var selButton: Button? = null
     private var movButton: Button? = null
+    private var extButton: Button? = null
+    private var subButton: Button? = null
 
     // Track active mode/tool in Kotlin for UI highlight
     private var isEditMode = false
@@ -51,6 +53,22 @@ class ToolbarManager(private val context: Context, private val glView: KronosGLS
 
             selButton?.background = if (activeTool == "SEL") getActiveDrawable() else getNormalDrawable()
             movButton?.background = if (activeTool == "MOV") getActiveDrawable() else getNormalDrawable()
+
+            // Update sub operations visually (alpha 0.3 when OBJ mode) and disable clicks
+            val meshOpsAlpha = if (isEditMode) 1.0f else 0.3f
+            val meshOpsEnabled = isEditMode
+
+            selButton?.alpha = meshOpsAlpha
+            selButton?.isEnabled = meshOpsEnabled
+
+            movButton?.alpha = meshOpsAlpha
+            movButton?.isEnabled = meshOpsEnabled
+
+            extButton?.alpha = meshOpsAlpha
+            extButton?.isEnabled = meshOpsEnabled
+
+            subButton?.alpha = meshOpsAlpha
+            subButton?.isEnabled = meshOpsEnabled
         }
     }
 
@@ -109,14 +127,21 @@ class ToolbarManager(private val context: Context, private val glView: KronosGLS
         }
         view.addView(movButton)
 
-        view.addView(createActionButton("⬆️ EXT") { glView.renderer.nativeExtrude() })
-        view.addView(createActionButton("➕ SUB") { glView.renderer.nativeSubdivide() })
+        extButton = createActionButton("⬆️ EXT") { glView.renderer.nativeExtrude() }
+        view.addView(extButton)
+
+        subButton = createActionButton("➕ SUB") { glView.renderer.nativeSubdivide() }
+        view.addView(subButton)
+
         view.addView(createActionButton("🔄 RST") {
             glView.renderer.nativeResetMesh()
             isEditMode = false
             activeTool = "SEL"
             updateButtonStyles()
         })
+
+        // Apply initial styles
+        updateButtonStyles()
     }
 
     private fun createActionButton(label: String, action: () -> Unit): Button {

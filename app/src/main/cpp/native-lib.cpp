@@ -42,20 +42,20 @@ out vec4 fragColor;
 void main() {
     vec3 lightDir = normalize(vec3(0.5, 1.0, 0.5));
     vec3 norm = normalize(v_Normal);
-    vec3 baseColor = vec3(0.78, 0.78, 0.78);
+    vec3 baseColor = vec3(0.85, 0.85, 0.85);
     
     // Ambient
-    vec3 ambient = 0.35 * baseColor;
+    vec3 ambient = 0.4 * baseColor;
     
     // Diffuse
     float diff = max(dot(norm, lightDir), 0.0);
     vec3 diffuse = diff * baseColor;
     
-    // Specular (Phong)
+    // Specular
     vec3 viewDir = normalize(u_CameraPos - v_FragPos);
     vec3 reflectDir = reflect(-lightDir, norm);
-    float spec = pow(max(dot(viewDir, reflectDir), 0.0), 32.0);
-    vec3 specular = 0.15 * vec3(1.0) * spec;
+    float spec = pow(max(dot(viewDir, reflectDir), 0.0), 16.0);
+    vec3 specular = 0.1 * vec3(1.0) * spec;
     
     fragColor = vec4(ambient + diffuse + specular, 1.0);
 })";
@@ -445,7 +445,7 @@ Java_com_kronos3d_GLSurfaceManager_nativeExtrude(JNIEnv* env, jobject obj) {
 
 extern "C" JNIEXPORT void JNICALL
 Java_com_kronos3d_GLSurfaceManager_nativeSubdivide(JNIEnv* env, jobject obj) {
-    if (selected_face_id != -1) {
+    if (current_edit_mode == EDIT_MODE && selected_face_id != -1) {
         kr_mesh_subdivide_face(mesh, selected_face_id);
         kr_mesh_rebuild_buffers();
         // Keep selected to allow further manipulation

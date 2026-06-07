@@ -53,7 +53,7 @@ void kr_mesh_subdivide_face(KrMesh& mesh, int face_id) {
     }
 
     // 2. Calculate Edge Midpoints
-    unsigned int mid[4];
+    unsigned int mid[4]; // mid[0] is mid of (v0,v1), mid[1] is mid of (v1,v2), mid[2] is mid of (v2,v3), mid[3] is mid of (v3,v0)
     for (int i = 0; i < count; i++) {
         int next = (i + 1) % count;
         KrVertex m;
@@ -78,82 +78,74 @@ void kr_mesh_subdivide_face(KrMesh& mesh, int face_id) {
 
     // 3. Reconstruct faces using center and midpoints
     if (is_quad) {
-        // Quad face split into 4 quads:
-        // Quad 0: v0 -> mid0 -> center -> mid3
-        // Quad 1: mid0 -> v1 -> mid1 -> center
-        // Quad 2: center -> mid1 -> v2 -> mid2
-        // Quad 3: mid3 -> center -> mid2 -> v3
+        // Quad face split into 4 quads matching standard indexing:
+        // quad1: v0, m01, c, m30
+        // quad2: m01, v1, m12, c
+        // quad3: c, m12, v2, m23
+        // quad4: m30, c, m23, v3
         mesh.faces[face_id] = {v[0], mid[0], idx_center, mid[3]};
         mesh.faces.push_back({mid[0], v[1], mid[1], idx_center});
         mesh.faces.push_back({idx_center, mid[1], v[2], mid[2]});
         mesh.faces.push_back({mid[3], idx_center, mid[2], v[3]});
     } else {
-        // Triangle split into 3 quads:
-        // Quad 0: v0 -> mid0 -> center -> mid2
-        // Quad 1: mid0 -> v1 -> mid1 -> center
-        // Quad 2: center -> mid1 -> v2 -> mid2
+        // Triangle split (treating count = 3):
+        // mid[0] (0-1), mid[1] (1-2), mid[2] (2-0)
         mesh.faces[face_id] = {v[0], mid[0], idx_center, mid[2]};
         mesh.faces.push_back({mid[0], v[1], mid[1], idx_center});
         mesh.faces.push_back({idx_center, mid[1], v[2], mid[2]});
     }
 }
 
-// Extrude face operator (BMesh method)
+// Extrude face operator (Blender exact mathematical specification - PASO 6)
 void kr_mesh_extrude_face(KrMesh& mesh, int face_id, float distance) {
     if (face_id < 0 || face_id >= (int)mesh.faces.size()) return;
 
     KrFace f = mesh.faces[face_id];
     bool is_quad = f.is_quad();
-    int count = is_quad ? 4 : 3;
+    if (!is_quad) return; // Spec specifies quad extrude
     unsigned int v[4] = {f.v0, f.v1, f.v2, f.v3};
 
-    // Calculate face normal via cross product of edges
-    glm::vec3 p0(mesh.vertices[v[0]].x, mesh.vertices[v[0]].y, mesh.vertices[v[0]].z);
-    glm::vec3 p1(mesh.vertices[v[1]].x, mesh.vertices[v[1]].y, mesh.vertices[v[1]].z);
-    glm::vec3 p2(mesh.vertices[v[2]].x, mesh.vertices[v[2]].y, mesh.vertices[v[2]].z);
-    glm::vec3 e1 = p1 - p0;
-    glm::vec3 e2 = p2 - p0;
-    glm::vec3 normal = glm::normalize(glm::cross(e1, e2));
+    glm::vec3 v0(mesh.vertices[v[0]].x, mesh.vertices[v[0]].y, mesh.vertices[v[0]].z);
+    glm::vec3 v1(mesh.vertices[v[1]].x, mesh.vertices[v[1]].y, mesh.vertices[v[1]].z);
+    glm::vec3 v2(mesh.vertices[v[2]].x, mesh.vertices[v[2]].y, mesh.vertices[v[2]].z);
+    glm::vec3 v3(mesh.vertices[v[3]].x, mesh.vertices[v[3]].y, mesh.vertices[v[3]].z);
+
+    // 1. Calculate normal = normalize(cross(v1-v0, v3-v0))
+    glm::vec3 normal = glm::normalize(glm::cross(v1 - v0, v3 - v0));
     glm::vec3 offset = normal * distance;
 
-    // Duplicated vertices for the new cap face
-    unsigned int ev[4];
-    for (int i = 0; i < count; i++) {
+    // 2. Duplicate vertices to offset positions (nv0, nv1, nv2, nv3)
+    unsigned int nv[4];
+    for (int i = 0; i < 4; i++) {
         KrVertex evi = mesh.vertices[v[i]];
         evi.x += offset.x; evi.y += offset.y; evi.z += offset.z;
-        // The normal of the top cap face remains the same normal
+        // Cap normal points outward in normal direction
         evi.nx = normal.x; evi.ny = normal.y; evi.nz = normal.z;
-        ev[i] = mesh.vertices.size();
+        nv[i] = mesh.vertices.size();
         mesh.vertices.push_back(evi);
     }
 
-    // Update original base vertices' normals to point outwards if needed, 
-    // but typically we keep them or average them. For visual correctness, let's keep them.
+    // 3. New cap face: nv0, nv1, nv2, nv3
+    mesh.faces[face_id] = {nv[0], nv[1], nv[2], nv[3]};
 
-    // Reassign top face (cap)
-    if (is_quad) {
-        mesh.faces[face_id] = {ev[0], ev[1], ev[2], ev[3]};
-    } else {
-        mesh.faces[face_id] = {ev[0], ev[1], ev[2], (unsigned int)-1};
-    }
+    // 4. Lateral faces (quads with flat normals)
+    unsigned int orig_v[4] = {v[0], v[1], v[2], v[3]};
+    unsigned int new_v[4] = {nv[0], nv[1], nv[2], nv[3]};
 
-    // Create lateral bridge faces with correct winding order to point normals outwards:
-    // For CCW winding on lateral faces: v[i] -> v[next] -> ev[next] -> ev[i]
-    for (int i = 0; i < count; i++) {
-        int next = (i + 1) % count;
-        // Lateral quad
-        unsigned int lv0 = v[i];
-        unsigned int lv1 = v[next];
-        unsigned int lv2 = ev[next];
-        unsigned int lv3 = ev[i];
+    for (int i = 0; i < 4; i++) {
+        int next = (i + 1) % 4;
         
-        // Let's compute a flat normal for the lateral face
+        // Define lateral quad vertices: v[i], v[next], nv[next], nv[i]
+        unsigned int lv0 = orig_v[i];
+        unsigned int lv1 = orig_v[next];
+        unsigned int lv2 = new_v[next];
+        unsigned int lv3 = new_v[i];
+
         glm::vec3 lp0(mesh.vertices[lv0].x, mesh.vertices[lv0].y, mesh.vertices[lv0].z);
         glm::vec3 lp1(mesh.vertices[lv1].x, mesh.vertices[lv1].y, mesh.vertices[lv1].z);
         glm::vec3 lp2(mesh.vertices[lv2].x, mesh.vertices[lv2].y, mesh.vertices[lv2].z);
         glm::vec3 l_normal = glm::normalize(glm::cross(lp1 - lp0, lp2 - lp0));
 
-        // Create duplicate vertices for lateral faces to have flat normals
         unsigned int final_l_idx[4];
         unsigned int src_idx[4] = {lv0, lv1, lv2, lv3};
         for (int k = 0; k < 4; k++) {

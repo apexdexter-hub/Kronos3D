@@ -9,22 +9,23 @@ uniform vec3 u_CameraPos;
 out vec4 fragColor;
 
 void main() {
+    // Light direcional from top-right-front
     vec3 lightDir = normalize(vec3(0.5, 1.0, 0.5));
     vec3 norm = normalize(v_Normal);
-    vec3 baseColor = vec3(0.6, 0.6, 0.6);
+    vec3 baseColor = vec3(0.85, 0.85, 0.85);
     
-    // Ambient
-    vec3 ambient = 0.25 * baseColor;
+    // Ambient (0.4 * baseColor)
+    vec3 ambient = 0.4 * baseColor;
     
-    // Diffuse
+    // Diffuse (max(dot(normal, lightDir), 0.0) * baseColor)
     float diff = max(dot(norm, lightDir), 0.0);
     vec3 diffuse = diff * baseColor;
     
-    // Specular (Phong)
+    // Specular (pow(max(dot(viewDir, reflectDir), 0.0), 16.0) * 0.1)
     vec3 viewDir = normalize(u_CameraPos - v_FragPos);
     vec3 reflectDir = reflect(-lightDir, norm);
-    float spec = pow(max(dot(viewDir, reflectDir), 0.0), 32.0);
-    vec3 specular = 0.15 * vec3(1.0) * spec;
+    float spec = pow(max(dot(viewDir, reflectDir), 0.0), 16.0);
+    vec3 specular = 0.1 * vec3(1.0) * spec;
     
     fragColor = vec4(ambient + diffuse + specular, 1.0);
 }
