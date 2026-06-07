@@ -9,6 +9,7 @@ export PATH="$JAVA_HOME/bin:$PATH"
 
 # Relative to script path
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+export ANDROID_HOME="${ANDROID_HOME:-$HOME/android-sdk}"
 OUTPUT_DIR="$SCRIPT_DIR/release"
 KEYSTORE="$HOME/kronos3d-dev.keystore"
 APK_UNSIGNED="$SCRIPT_DIR/app/build/outputs/apk/debug/app-debug.apk"
@@ -52,7 +53,7 @@ $ANDROID_HOME/build-tools/35.0.0/zipalign -f -v 4 \
 # Sign
 $ANDROID_HOME/build-tools/35.0.0/apksigner sign \
     --ks "$KEYSTORE" \
-    --ks-alias kronos3d-dev \
+    --ks-key-alias kronos3d-dev \
     --ks-pass pass:kronos3d2024 \
     --key-pass pass:kronos3d2024 \
     --out "$APK_SIGNED" \
