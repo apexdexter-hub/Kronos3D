@@ -140,16 +140,17 @@ void kr_mesh_extrude_face(KrMesh& mesh, int face_id, float distance) {
         mesh.vertices.push_back(evi);
     }
 
-    // 3. Keep original face at face_id as base.
-    // Update original base vertices' normals to point inwards (opposite of normal)
+    // 3. Keep original face as base, but update its vertices' normals to point inwards (opposite of normal)
     for (int i = 0; i < 4; i++) {
         mesh.vertices[v[i]].nx = -normal.x;
         mesh.vertices[v[i]].ny = -normal.y;
         mesh.vertices[v[i]].nz = -normal.z;
     }
+    // Re-push the base face with these updated vertices
+    mesh.faces.push_back({v[0], v[1], v[2], v[3]});
 
-    // 4. Add new cap face: nv0, nv1, nv2, nv3
-    mesh.faces.push_back({nv[0], nv[1], nv[2], nv[3]});
+    // 4. Update the selected face_id to be the new extruded cap face: nv0, nv1, nv2, nv3
+    mesh.faces[face_id] = {nv[0], nv[1], nv[2], nv[3]};
 
     // 5. Create 4 lateral faces (quads with flat normals)
     unsigned int orig_v[4] = {v[0], v[1], v[2], v[3]};
@@ -183,8 +184,8 @@ void kr_mesh_extrude_face(KrMesh& mesh, int face_id, float distance) {
 }
 
 void kr_mesh_subdivide_all(KrMesh& mesh) {
-    int faceCount = mesh.faces.size();
-    for (int i = 0; i < faceCount; i++) {
+    int count = (int)mesh.faces.size();
+    for (int i = 0; i < count; i++) {
         kr_mesh_subdivide_face(mesh, i);
     }
 }

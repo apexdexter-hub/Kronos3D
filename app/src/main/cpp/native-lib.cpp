@@ -417,9 +417,11 @@ Java_com_kronos3d_GLSurfaceManager_nativeGizmoUp(JNIEnv* env, jobject obj) {
     g_active_gizmo_axis = -1;
 }
 
+static std::atomic<bool> g_MeshDirty{false};
+
 extern "C" JNIEXPORT void JNICALL
 Java_com_kronos3d_GLSurfaceManager_nativeToggleEditMode(JNIEnv* env, jobject obj) {
-    if (mesh.isDirty) return;
+    if (g_MeshDirty) return;
     if (current_edit_mode == OBJECT_MODE) {
         current_edit_mode = EDIT_MODE;
     } else {
@@ -444,29 +446,25 @@ Java_com_kronos3d_GLSurfaceManager_nativeSetToolMove(JNIEnv* env, jobject obj) {
 extern "C" JNIEXPORT void JNICALL
 Java_com_kronos3d_GLSurfaceManager_nativeExtrude(JNIEnv* env, jobject obj) {
     if (current_edit_mode == EDIT_MODE && selected_face_id != -1) {
+        g_MeshDirty = true;
         kr_mesh_extrude_face(mesh, selected_face_id, 1.0f);
-        // Point selection to the newly added cap face
-        selected_face_id = mesh.faces.size() - 5; // 1 cap face + 4 side faces added. So cap index is total size - 5. Let's verify: size increases by 5 (1 cap + 4 side faces). The cap face is pushed right after vertices copy.
-        // Wait, mesh.faces.push_back(cap) is pushed before lateral faces are pushed in mesh_ops.cpp.
-        // So the cap index was size before lateral faces, which corresponds to the size of faces list before push_back(cap).
-        // Let's compute it accurately: the cap face index is (old_size), and then 4 lateral faces are appended.
-        // Thus, the cap index in the new faces array is: new_faces.size() - 5.
         if ((int)mesh.faces.size() >= 5) {
             selected_face_id = (int)mesh.faces.size() - 5;
         }
         kr_mesh_rebuild_buffers();
+        g_MeshDirty = false;
     }
 }
 
 extern "C" JNIEXPORT void JNICALL
 Java_com_kronos3d_GLSurfaceManager_nativeSubdivide(JNIEnv* env, jobject obj) {
     if (current_edit_mode == EDIT_MODE) {
-        if (mesh.isDirty) return;
-        mesh.isDirty = true;
+        if (g_MeshDirty) return;
+        g_MeshDirty = true;
         std::thread([]() {
             kr_mesh_subdivide_all(mesh);
             g_NeedGPUUpdate = true;
-            mesh.isDirty = false;
+            g_MeshDirty = false;
         }).detach();
     }
 }

@@ -143,17 +143,13 @@ bool kr_gizmo_drag(KrMesh& mesh, int selected_vertex_id, int selected_face_id, K
                 }
             }
         } else if (selected_face_id != -1 && selected_face_id < (int)mesh.faces.size()) {
-            const KrFace& f = mesh.faces[selected_face_id];
-            unsigned int face_v[4] = {f.v0, f.v1, f.v2, f.v3};
+            KrFace& f = mesh.faces[selected_face_id];
             int count = f.is_quad() ? 4 : 3;
-            
-            // To ensure we move shared vertices without duplication or drift,
-            // we gather the exact indices of the vertices that define this face.
-            // Move those vertices.
+            unsigned int verts[4] = {f.v0, f.v1, f.v2, f.v3};
             for (int i = 0; i < count; i++) {
-                mesh.vertices[face_v[i]].x += delta.x;
-                mesh.vertices[face_v[i]].y += delta.y;
-                mesh.vertices[face_v[i]].z += delta.z;
+                if (g_active_gizmo_axis == 0) mesh.vertices[verts[i]].x += displacement;
+                if (g_active_gizmo_axis == 1) mesh.vertices[verts[i]].y += displacement;
+                if (g_active_gizmo_axis == 2) mesh.vertices[verts[i]].z += displacement;
             }
         }
     }
