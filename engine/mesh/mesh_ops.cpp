@@ -70,8 +70,13 @@ void kr_mesh_extrude_face(KrMesh& mesh, int face_id, float distance) {
     KrVertex v1 = mesh.vertices[f.v1];
     KrVertex v2 = mesh.vertices[f.v2];
 
-    // Face normal direction
-    glm::vec3 normal = glm::normalize(glm::vec3(v0.nx, v0.ny, v0.nz));
+    // Face normal direction via cross product of edges
+    glm::vec3 p0(v0.x, v0.y, v0.z);
+    glm::vec3 p1(v1.x, v1.y, v1.z);
+    glm::vec3 p2(v2.x, v2.y, v2.z);
+    glm::vec3 e1 = p1 - p0;
+    glm::vec3 e2 = p2 - p0;
+    glm::vec3 normal = glm::normalize(glm::cross(e1, e2));
     glm::vec3 offset = normal * distance;
 
     // Create extruded vertices
@@ -83,19 +88,22 @@ void kr_mesh_extrude_face(KrMesh& mesh, int face_id, float distance) {
     unsigned int idx_ev1 = mesh.vertices.size(); mesh.vertices.push_back(ev1);
     unsigned int idx_ev2 = mesh.vertices.size(); mesh.vertices.push_back(ev2);
 
-    // Reassign top face
+    // Reassign top face (cap)
     mesh.faces[face_id] = { idx_ev0, idx_ev1, idx_ev2 };
 
     // Create lateral faces to bridge extrusion
     // Side 1 (v0 -> v1)
-    mesh.faces.push_back({ f.v0, f.v1, idx_ev1 });
-    mesh.faces.push_back({ f.v0, idx_ev1, idx_ev0 });
+    // Quad: v1, ev1, ev0, v0
+    mesh.faces.push_back({ f.v1, idx_ev1, idx_ev0 });
+    mesh.faces.push_back({ f.v1, idx_ev0, f.v0 });
 
     // Side 2 (v1 -> v2)
-    mesh.faces.push_back({ f.v1, f.v2, idx_ev2 });
-    mesh.faces.push_back({ f.v1, idx_ev2, idx_ev1 });
+    // Quad: v2, ev2, ev1, v1
+    mesh.faces.push_back({ f.v2, idx_ev2, idx_ev1 });
+    mesh.faces.push_back({ f.v2, idx_ev1, f.v1 });
 
     // Side 3 (v2 -> v0)
-    mesh.faces.push_back({ f.v2, f.v0, idx_ev0 });
-    mesh.faces.push_back({ f.v2, idx_ev0, idx_ev2 });
+    // Quad: v0, ev0, ev2, v2
+    mesh.faces.push_back({ f.v0, idx_ev0, idx_ev2 });
+    mesh.faces.push_back({ f.v0, idx_ev2, f.v2 });
 }

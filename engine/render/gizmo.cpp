@@ -82,21 +82,58 @@ bool kr_gizmo_drag(KrMesh& mesh, int selected_vertex_id, int selected_face_id, K
     camera_pos.y = distance * sin(rad_el);
     camera_pos.z = distance * cos(rad_el) * cos(rad_az);
     glm::mat4 view = glm::lookAt(camera_pos, glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
-    glm::mat4 model = glm::mat4(1.0f);
-    glm::mat4 mvp = projection * view * model;
+    glm::mat4 mvp = projection * view; // Model matrix is Identity
 
     glm::vec3 center = kr_gizmo_get_selection_center(mesh, selected_vertex_id, selected_face_id, edit_mode);
-    glm::vec2 s_center = project_to_screen(center, mvp, screen_width, screen_height);
-    glm::vec2 s_tip = project_to_screen(center + dir, mvp, screen_width, screen_height);
 
-    glm::vec2 axis_vec = s_tip - s_center;
-    float axis_len = glm::length(axis_vec);
-    if (axis_len > 0.001f) {
-        glm::vec2 drag_vec(dx, -dy);
-        float proj = glm::dot(drag_vec, axis_vec / axis_len);
+    // Calculate eye vector to choose the best facing constraint plane
+    glm::vec3 eye = glm::normalize(camera_pos - center);
+    
+    // Choose active plane normal based on the active axis and viewing angle
+    glm::vec3 plane_normal(0.0f);
+    if (g_active_gizmo_axis == 0) { // X axis -> use XY or XZ plane
+        if (std::abs(eye.y) > std::abs(eye.z)) plane_normal = glm::vec3(0.0f, 0.0f, 1.0f); // XY plane
+        else plane_normal = glm::vec3(0.0f, 1.0f, 0.0f); // XZ plane
+    } else if (g_active_gizmo_axis == 1) { // Y axis -> use XY or YZ plane
+        if (std::abs(eye.x) > std::abs(eye.z)) plane_normal = glm::vec3(0.0f, 0.0f, 1.0f); // XY plane
+        else plane_normal = glm::vec3(1.0f, 0.0f, 0.0f); // YZ plane
+    } else if (g_active_gizmo_axis == 2) { // Z axis -> use XZ or YZ plane
+        if (std::abs(eye.x) > std::abs(eye.y)) plane_normal = glm::vec3(0.0f, 1.0f, 0.0f); // XZ plane
+        else plane_normal = glm::vec3(1.0f, 0.0f, 0.0f); // YZ plane
+    }
+
+    // Convert dx, dy to Normalized Device Coordinates (-1 to +1)
+    // Note: dy is usually screen delta (positive down), so we negate it for NDC (positive up)
+    float ndc_dx = (2.0f * dx) / (float)screen_width;
+    float ndc_dy = -(2.0f * dy) / (float)screen_height;
+    
+    // Calculate inverse matrix to unproject NDC back to world space
+    glm::mat4 inv_vp = glm::inverse(mvp);
+    
+    // Unproject a small vector in NDC space corresponding to dx, dy from the center's NDC position
+    glm::vec4 center_clip = mvp * glm::vec4(center, 1.0f);
+    glm::vec3 center_ndc = glm::vec3(center_clip) / center_clip.w;
+    
+    glm::vec4 ray_clip = glm::vec4(center_ndc.x + ndc_dx, center_ndc.y + ndc_dy, center_ndc.z, 1.0f);
+    glm::vec4 ray_world_pt = inv_vp * ray_clip;
+    glm::vec3 ray_pt = glm::vec3(ray_world_pt) / ray_world_pt.w;
+    
+    // The direction of the "drag ray" in world space
+    glm::vec3 ray_dir = glm::normalize(ray_pt - camera_pos);
+    
+    // Intersect drag ray with active plane
+    // Plane eq: dot(N, P - center) = 0
+    // Line eq: P = camera_pos + t * ray_dir
+    float denom = glm::dot(plane_normal, ray_dir);
+    if (std::abs(denom) > 1e-6) {
+        float t = glm::dot(plane_normal, center - camera_pos) / denom;
+        glm::vec3 intersection = camera_pos + t * ray_dir;
         
-        // Displace scaling factor
-        float displacement = proj * 0.005f * distance;
+        // The total world-space drag offset
+        glm::vec3 drag_offset = intersection - center;
+        
+        // Extract ONLY the component along the active axis
+        float displacement = glm::dot(drag_offset, dir);
         glm::vec3 delta = dir * displacement;
 
         if (edit_mode == EDIT_MODE && selected_vertex_id != -1 && selected_vertex_id < (int)mesh.vertices.size()) {
