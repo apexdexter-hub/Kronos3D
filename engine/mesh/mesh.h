@@ -17,7 +17,27 @@ struct KrMesh {
     std::vector<KrFace> faces;
 };
 
+enum KrEditMode {
+    OBJECT_MODE,
+    EDIT_MODE
+};
+
+enum KrToolMode {
+    TOOL_SELECT,
+    TOOL_MOVE,
+    TOOL_EXTRUDE,
+    TOOL_SUBDIVIDE
+};
+
 // Generates a Phong-lit cube with distinct normals per face (24 vertices, 12 triangles)
 KrMesh kr_mesh_create_cube();
+
+// Raycast: returns selected face index or -1 if no face is hit
+int kr_mesh_raycast(const KrMesh& mesh, const float* model_matrix, const float* view_matrix, const float* projection_matrix, const float* ray_origin, const float* ray_dir);
+
+// Operators
+void kr_mesh_subdivide_face(KrMesh& mesh, int face_id);
+void kr_mesh_extrude_face(KrMesh& mesh, int face_id, float distance);
+void kr_mesh_move_vertex(KrMesh& mesh, int vertex_id, float dx, float dz);
 
 #endif // KRONOS_MESH_H
