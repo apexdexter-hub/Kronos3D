@@ -43,10 +43,8 @@ class KronosGLSurfaceView(context: Context) : GLSurfaceView(context) {
                 val duration = System.currentTimeMillis() - downTime
                 val dist = Math.hypot((x - prevX).toDouble(), (y - prevY).toDouble())
                 if (duration < 200 && dist < 15) {
-                    val normX = (x / width) * 2.0f - 1.0f
-                    val normY = -((y / height) * 2.0f - 1.0f)
                     queueEvent {
-                        renderer.nativeTap(normX, normY)
+                        renderer.nativeTap(x, y)
                     }
                 }
             }

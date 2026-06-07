@@ -6,6 +6,7 @@
 #include <glm/gtc/type_ptr.hpp>
 #include <chrono>
 #include <cmath>
+#include <thread>
 
 #include "engine/mesh/mesh.h"
 #include "engine/render/viewport.h"
@@ -163,6 +164,8 @@ Java_com_kronos3d_GLSurfaceManager_nativeResize(JNIEnv* env, jobject obj, jint w
 
 extern "C" JNIEXPORT void JNICALL
 Java_com_kronos3d_GLSurfaceManager_nativeRender(JNIEnv* env, jobject obj) {
+    auto frame_start = std::chrono::high_resolution_clock::now();
+
     // Measure FPS
     auto current_time = std::chrono::high_resolution_clock::now();
     std::chrono::duration<float> delta = current_time - last_frame_time;
@@ -249,6 +252,11 @@ Java_com_kronos3d_GLSurfaceManager_nativeRender(JNIEnv* env, jobject obj) {
 
         glBindVertexArray(0);
     }
+
+    // Limit to 60 FPS maximum
+    const auto targetFrameTime = std::chrono::milliseconds(16);
+    auto frameEnd = frame_start + targetFrameTime;
+    std::this_thread::sleep_until(frameEnd);
 }
 
 extern "C" JNIEXPORT void JNICALL
@@ -271,7 +279,11 @@ Java_com_kronos3d_GLSurfaceManager_nativeZoom(JNIEnv* env, jobject obj, jfloat d
 
 // Tap selection logic JNI delegate
 extern "C" JNIEXPORT void JNICALL
-Java_com_kronos3d_GLSurfaceManager_nativeTap(JNIEnv* env, jobject obj, jfloat normalized_x, jfloat normalized_y) {
+Java_com_kronos3d_GLSurfaceManager_nativeTap(JNIEnv* env, jobject obj, jfloat pixel_x, jfloat pixel_y) {
+    // Convert click coordinates to NDC space
+    float normalized_x = (2.0f * pixel_x / (float)screen_width) - 1.0f;
+    float normalized_y = 1.0f - (2.0f * pixel_y / (float)screen_height);
+
     // 1. Calculate raycast in world space from camera position
     float aspect = (float)screen_width / (float)screen_height;
     glm::mat4 projection = glm::perspective(glm::radians(45.0f), aspect, 0.1f, 100.0f);
