@@ -5,6 +5,7 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include <chrono>
+#include <cmath>
 
 #include "engine/mesh/mesh.h"
 #include "engine/render/viewport.h"
