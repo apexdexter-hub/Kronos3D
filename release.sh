@@ -2,6 +2,11 @@
 FASE=${1:-"1"}
 DESC=${2:-"build"}
 VERSION="fase${FASE}-${DESC}"
+
+# Export JDK 17 explicitly to prevent Kotlin compiler crash on JDK 25
+export JAVA_HOME="/usr/lib/jvm/java-1.17.0-openjdk-amd64"
+export PATH="$JAVA_HOME/bin:$PATH"
+
 OUTPUT_DIR="/workspaces/codespaces-blank/solid-capybara/Kronos3D/release"
 KEYSTORE="$HOME/kronos3d-dev.keystore"
 APK_UNSIGNED="app/build/outputs/apk/debug/app-debug.apk"
