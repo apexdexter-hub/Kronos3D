@@ -29,10 +29,11 @@ class ToolbarManager(private val context: Context, private val glView: KronosGLS
                 setMargins(0, 8, 0, 8)
             }
             setOnClickListener {
+                val btn = this
                 glView.queueEvent {
                     glView.renderer.nativeToggleEditMode()
-                    post {
-                        text = if (text == "EDIT") "OBJ" else "EDIT"
+                    btn.post {
+                        btn.text = if (btn.text == "EDIT") "OBJ" else "EDIT"
                     }
                 }
             }
@@ -45,7 +46,7 @@ class ToolbarManager(private val context: Context, private val glView: KronosGLS
         view.addView(createButton("SUB") { glView.renderer.nativeSubdivide() })
         view.addView(createButton("RST") {
             glView.renderer.nativeResetMesh()
-            post {
+            editButton?.post {
                 editButton?.text = "EDIT"
             }
         })
