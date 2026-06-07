@@ -225,14 +225,16 @@ Java_com_kronos3d_GLSurfaceManager_nativeRender(JNIEnv* env, jobject obj) {
     // 2. Draw Phong Lit Cube
     glUseProgram(mesh_program);
     GLint mvp_loc = glGetUniformLocation(mesh_program, "u_MVP");
-    GLint model_loc = glGetUniformLocation(mesh_program, "u_Model");
+    GLint light_pos_loc = glGetUniformLocation(mesh_program, "u_LightPos");
     GLint cam_pos_loc = glGetUniformLocation(mesh_program, "u_CameraPos");
 
     glUniformMatrix4fv(mvp_loc, 1, GL_FALSE, glm::value_ptr(mvp));
-    glUniformMatrix4fv(model_loc, 1, GL_FALSE, glm::value_ptr(model));
+    glUniform3f(light_pos_loc, 10.0f, 20.0f, 10.0f);
     glUniform3f(cam_pos_loc, camera_pos.x, camera_pos.y, camera_pos.z);
 
     glBindVertexArray(cube_vao);
+    // Explicitly bind the correct index buffer to fix initial mangled shape
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, cube_ebo);
     glDrawElements(GL_TRIANGLES, g_indices.size(), GL_UNSIGNED_INT, 0);
     glBindVertexArray(0);
 
@@ -381,6 +383,30 @@ Java_com_kronos3d_GLSurfaceManager_nativeTap(JNIEnv* env, jobject obj, jfloat pi
 }
 
 extern "C" JNIEXPORT void JNICALL
+Java_com_kronos3d_GLSurfaceManager_nativeGizmoDown(JNIEnv* env, jobject obj, jfloat x, jfloat y) {
+    if (selected_face_id == -1 && selected_vertex_id == -1) return;
+    
+    float aspect = (float)screen_width / (float)screen_height;
+    glm::mat4 projection = glm::perspective(glm::radians(45.0f), aspect, 0.1f, 100.0f);
+    float rad_az = glm::radians(camera.azimuth);
+    float rad_el = glm::radians(camera.elevation);
+    glm::vec3 camera_pos;
+    camera_pos.x = camera.distance * cos(rad_el) * sin(rad_az);
+    camera_pos.y = camera.distance * sin(rad_el);
+    camera_pos.z = camera.distance * cos(rad_el) * cos(rad_az);
+    glm::mat4 view = glm::lookAt(camera_pos, glm::vec3(0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+    glm::mat4 model = glm::mat4(1.0f);
+    glm::mat4 mvp = projection * view * model;
+
+    kr_gizmo_down(mesh, selected_vertex_id, selected_face_id, current_edit_mode, x, y, screen_width, screen_height, mvp, camera.distance, camera.azimuth, camera.elevation);
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_kronos3d_GLSurfaceManager_nativeGizmoUp(JNIEnv* env, jobject obj) {
+    g_active_gizmo_axis = -1;
+}
+
+extern "C" JNIEXPORT void JNICALL
 Java_com_kronos3d_GLSurfaceManager_nativeToggleEditMode(JNIEnv* env, jobject obj) {
     if (current_edit_mode == OBJECT_MODE) {
         current_edit_mode = EDIT_MODE;
@@ -403,8 +429,8 @@ Java_com_kronos3d_GLSurfaceManager_nativeSetToolMove(JNIEnv* env, jobject obj) {
 
 extern "C" JNIEXPORT void JNICALL
 Java_com_kronos3d_GLSurfaceManager_nativeExtrude(JNIEnv* env, jobject obj) {
-    if (selected_face_id != -1) {
-        kr_mesh_extrude_face(mesh, selected_face_id, 0.5f);
+    if (current_edit_mode == EDIT_MODE && selected_face_id != -1) {
+        kr_mesh_extrude_face(mesh, selected_face_id, 1.0f);
         kr_mesh_rebuild_buffers();
         selected_face_id = -1;
     }
@@ -493,24 +519,3 @@ Java_com_kronos3d_GLSurfaceManager_nativeLoadMesh(JNIEnv* env, jobject obj) {
     kr_mesh_rebuild_buffers();
 }
 
-extern "C" JNIEXPORT void JNICALL
-Java_com_kronos3d_GLSurfaceManager_nativeGizmoDown(JNIEnv* env, jobject obj, jfloat pixel_x, jfloat pixel_y) {
-    float aspect = (float)screen_width / (float)screen_height;
-    glm::mat4 projection = glm::perspective(glm::radians(45.0f), aspect, 0.1f, 100.0f);
-    float rad_az = glm::radians(camera.azimuth);
-    float rad_el = glm::radians(camera.elevation);
-    glm::vec3 camera_pos;
-    camera_pos.x = camera.distance * cos(rad_el) * sin(rad_az);
-    camera_pos.y = camera.distance * sin(rad_el);
-    camera_pos.z = camera.distance * cos(rad_el) * cos(rad_az);
-    glm::mat4 view = glm::lookAt(camera_pos, glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
-    glm::mat4 model = glm::mat4(1.0f);
-    glm::mat4 mvp = projection * view * model;
-
-    kr_gizmo_down(mesh, selected_vertex_id, selected_face_id, current_edit_mode, pixel_x, pixel_y, screen_width, screen_height, mvp, camera.distance, camera.azimuth, camera.elevation);
-}
-
-extern "C" JNIEXPORT void JNICALL
-Java_com_kronos3d_GLSurfaceManager_nativeGizmoUp(JNIEnv* env, jobject obj) {
-    g_active_gizmo_axis = -1;
-}
