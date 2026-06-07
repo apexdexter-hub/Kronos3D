@@ -18,6 +18,7 @@ class KronosGLSurfaceView(context: Context) : GLSurfaceView(context) {
 
     private var prevX = 0f
     private var prevY = 0f
+    private var downTime = 0L
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
         val x = event.x
@@ -28,6 +29,19 @@ class KronosGLSurfaceView(context: Context) : GLSurfaceView(context) {
             MotionEvent.ACTION_DOWN -> {
                 prevX = x
                 prevY = y
+                downTime = System.currentTimeMillis()
+            }
+            MotionEvent.ACTION_UP -> {
+                val duration = System.currentTimeMillis() - downTime
+                val dist = Math.hypot((x - prevX).toDouble(), (y - prevY).toDouble())
+                // Tap gesture detected (less than 200ms and 15px movement delta)
+                if (duration < 200 && dist < 15) {
+                    val normX = (x / width) * 2.0f - 1.0f
+                    val normY = -((y / height) * 2.0f - 1.0f)
+                    queueEvent {
+                        renderer.nativeTap(normX, normY)
+                    }
+                }
             }
             MotionEvent.ACTION_MOVE -> {
                 if (event.pointerCount == 1) {

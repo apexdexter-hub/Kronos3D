@@ -32,4 +32,5 @@ class GLSurfaceManager : GLSurfaceView.Renderer {
     // Touch handler delegates
     external fun nativeOrbit(dx: Float, dy: Float)
     external fun nativeZoom(delta: Float)
+    external fun nativeTap(normalizedX: Float, normalizedY: Float)
 }
