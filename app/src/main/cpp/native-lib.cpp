@@ -105,6 +105,7 @@ static KrToolMode current_tool_mode = TOOL_SELECT;
 // Selection status
 static int selected_face_id = -1;
 static int selected_vertex_id = -1;
+static std::atomic<bool> g_NeedGPUUpdate{false};
 
 // Grid wireframe shaders
 static GLuint wire_program = 0;
@@ -194,6 +195,10 @@ Java_com_kronos3d_GLSurfaceManager_nativeResize(JNIEnv* env, jobject obj, jint w
 
 extern "C" JNIEXPORT void JNICALL
 Java_com_kronos3d_GLSurfaceManager_nativeRender(JNIEnv* env, jobject obj) {
+    if (g_NeedGPUUpdate) {
+        kr_mesh_rebuild_buffers();
+        g_NeedGPUUpdate = false;
+    }
     auto frame_start = std::chrono::high_resolution_clock::now();
 
     // Measure FPS
@@ -414,6 +419,7 @@ Java_com_kronos3d_GLSurfaceManager_nativeGizmoUp(JNIEnv* env, jobject obj) {
 
 extern "C" JNIEXPORT void JNICALL
 Java_com_kronos3d_GLSurfaceManager_nativeToggleEditMode(JNIEnv* env, jobject obj) {
+    if (mesh.isDirty) return;
     if (current_edit_mode == OBJECT_MODE) {
         current_edit_mode = EDIT_MODE;
     } else {
@@ -455,8 +461,13 @@ Java_com_kronos3d_GLSurfaceManager_nativeExtrude(JNIEnv* env, jobject obj) {
 extern "C" JNIEXPORT void JNICALL
 Java_com_kronos3d_GLSurfaceManager_nativeSubdivide(JNIEnv* env, jobject obj) {
     if (current_edit_mode == EDIT_MODE) {
-        kr_mesh_subdivide_all(mesh);
-        kr_mesh_rebuild_buffers();
+        if (mesh.isDirty) return;
+        mesh.isDirty = true;
+        std::thread([]() {
+            kr_mesh_subdivide_all(mesh);
+            g_NeedGPUUpdate = true;
+            mesh.isDirty = false;
+        }).detach();
     }
 }
 

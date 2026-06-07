@@ -2,6 +2,7 @@
 #define KRONOS_MESH_H
 
 #include <vector>
+#include <atomic>
 
 struct KrVertex {
     float x, y, z;
@@ -19,6 +20,7 @@ struct KrFace {
 struct KrMesh {
     std::vector<KrVertex> vertices;
     std::vector<KrFace> faces;
+    bool isDirty = false;
 };
 
 enum KrEditMode {
