@@ -87,6 +87,7 @@ static GLuint overlay_program = 0;
 static GLuint cube_vao = 0;
 static GLuint cube_vbo = 0;
 static GLuint cube_ebo = 0;
+static GLuint wire_ebo = 0;
 
 static int screen_width = 1280;
 static int screen_height = 720;
@@ -112,25 +113,39 @@ static GLuint vtx_program = 0;
 static void kr_mesh_rebuild_buffers();
 
 static std::vector<unsigned int> g_indices;
+static std::vector<unsigned int> g_wire_indices;
 
 static void kr_mesh_rebuild_buffers() {
     glBindBuffer(GL_ARRAY_BUFFER, cube_vbo);
     glBufferData(GL_ARRAY_BUFFER, mesh.vertices.size() * sizeof(KrVertex), mesh.vertices.data(), GL_STATIC_DRAW);
 
     g_indices.clear();
+    g_wire_indices.clear();
     for (const auto& f : mesh.faces) {
         g_indices.push_back(f.v0);
         g_indices.push_back(f.v1);
         g_indices.push_back(f.v2);
+        
+        g_wire_indices.push_back(f.v0); g_wire_indices.push_back(f.v1);
+        g_wire_indices.push_back(f.v1); g_wire_indices.push_back(f.v2);
+        
         if (f.is_quad()) {
             g_indices.push_back(f.v0);
             g_indices.push_back(f.v2);
             g_indices.push_back(f.v3);
+            
+            g_wire_indices.push_back(f.v2); g_wire_indices.push_back(f.v3);
+            g_wire_indices.push_back(f.v3); g_wire_indices.push_back(f.v0);
+        } else {
+            g_wire_indices.push_back(f.v2); g_wire_indices.push_back(f.v0);
         }
     }
 
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, cube_ebo);
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, g_indices.size() * sizeof(unsigned int), g_indices.data(), GL_STATIC_DRAW);
+    
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, wire_ebo);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, g_wire_indices.size() * sizeof(unsigned int), g_wire_indices.data(), GL_STATIC_DRAW);
 }
 
 extern "C" JNIEXPORT void JNICALL
@@ -150,6 +165,7 @@ Java_com_kronos3d_GLSurfaceManager_nativeInit(JNIEnv* env, jobject obj) {
     glGenVertexArrays(1, &cube_vao);
     glGenBuffers(1, &cube_vbo);
     glGenBuffers(1, &cube_ebo);
+    glGenBuffers(1, &wire_ebo);
 
     glBindVertexArray(cube_vao);
 
@@ -253,14 +269,10 @@ Java_com_kronos3d_GLSurfaceManager_nativeRender(JNIEnv* env, jobject obj) {
 
         // 1. Draw Edges as wireframe lines (White)
         glUniform4f(overlay_color_loc, 1.0f, 1.0f, 1.0f, 0.8f);
-        // Draw using line loop
-        int wire_idx_offset = 0;
-        for (size_t i = 0; i < mesh.faces.size(); ++i) {
-            int count = mesh.faces[i].is_quad() ? 6 : 3;
-            // Draw as triangles in wireframe mode: this isn't perfect (shows quad diagonal) but works safely
-            glDrawElements(GL_LINE_LOOP, count, GL_UNSIGNED_INT, (void*)(wire_idx_offset * sizeof(unsigned int)));
-            wire_idx_offset += count;
-        }
+        // Draw using line list without diagonals
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, wire_ebo);
+        glDrawElements(GL_LINES, g_wire_indices.size(), GL_UNSIGNED_INT, 0);
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, cube_ebo); // restore normal index buffer
 
         // 2. Draw Vertices as white points (White)
         glUniform4f(overlay_color_loc, 1.0f, 1.0f, 1.0f, 1.0f);

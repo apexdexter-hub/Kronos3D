@@ -10,6 +10,9 @@ struct KrVertex {
 
 struct KrFace {
     unsigned int v0, v1, v2, v3;
+    KrFace() : v0(0), v1(0), v2(0), v3((unsigned int)-1) {}
+    KrFace(unsigned int a, unsigned int b, unsigned int c) : v0(a), v1(b), v2(c), v3((unsigned int)-1) {}
+    KrFace(unsigned int a, unsigned int b, unsigned int c, unsigned int d) : v0(a), v1(b), v2(c), v3(d) {}
     bool is_quad() const { return v3 != (unsigned int)-1; }
 };
 
