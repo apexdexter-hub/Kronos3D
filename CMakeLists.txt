@@ -34,6 +34,10 @@ include_directories(
 # Define native engine library target
 add_library(kronos3d_engine SHARED
     app/src/main/cpp/native-lib.cpp
+    engine/mesh/mesh.cpp
+    engine/render/viewport.cpp
+    engine/render/shader.cpp
+    engine/render/overlay.cpp
 )
 
 # Link log, android, and openGL GLESv3 libraries
