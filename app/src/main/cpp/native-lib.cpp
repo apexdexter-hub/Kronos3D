@@ -151,8 +151,10 @@ static void kr_mesh_rebuild_buffers() {
 extern "C" JNIEXPORT void JNICALL
 Java_com_kronos3d_GLSurfaceManager_nativeInit(JNIEnv* env, jobject obj) {
     LOGI("nativeInit: Initializing OpenGL viewport and resources (Fase 2)");
-    glClearColor(0.05f, 0.05f, 0.05f, 1.0f);
+    glClearColor(0.24f, 0.24f, 0.24f, 1.0f); // Blender default viewport color
     glEnable(GL_DEPTH_TEST);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
     kr_camera_init(camera);
     mesh = kr_mesh_create_cube();
@@ -435,7 +437,7 @@ Java_com_kronos3d_GLSurfaceManager_nativeExtrude(JNIEnv* env, jobject obj) {
     if (current_edit_mode == EDIT_MODE && selected_face_id != -1) {
         kr_mesh_extrude_face(mesh, selected_face_id, 1.0f);
         kr_mesh_rebuild_buffers();
-        selected_face_id = -1;
+        // Keep the extruded face selected so the user can immediately drag it with the Gizmo
     }
 }
 
@@ -444,7 +446,7 @@ Java_com_kronos3d_GLSurfaceManager_nativeSubdivide(JNIEnv* env, jobject obj) {
     if (selected_face_id != -1) {
         kr_mesh_subdivide_face(mesh, selected_face_id);
         kr_mesh_rebuild_buffers();
-        selected_face_id = -1;
+        // Keep selected to allow further manipulation
     }
 }
 
@@ -512,6 +514,16 @@ Java_com_kronos3d_GLSurfaceManager_nativeLoadMesh(JNIEnv* env, jobject obj) {
     size_t face_count = 0;
     in.read(reinterpret_cast<char*>(&face_count), sizeof(face_count));
     if (face_count == 0) return;
+    
+    // Quick validation: if the mesh has 12 faces but 24 vertices, it's the old triangle-only bugged cube
+    if (vert_count == 24 && face_count == 12) {
+        LOGI("Detected old bugged triangle mesh. Discarding load to prevent deformities.");
+        in.close();
+        mesh = kr_mesh_create_cube();
+        kr_mesh_rebuild_buffers();
+        return;
+    }
+    
     mesh.faces.resize(face_count);
     in.read(reinterpret_cast<char*>(mesh.faces.data()), face_count * sizeof(KrFace));
     
