@@ -14,6 +14,8 @@ void KrOverlay::init() {
     std::vector<float> grid_vertices;
     float step = 1.0f;
     int size = 10;
+    
+    // Grid Lines
     for (int i = -size; i <= size; ++i) {
         // Line along X
         grid_vertices.push_back((float)i * step); grid_vertices.push_back(0.0f); grid_vertices.push_back(-(float)size * step);
@@ -23,6 +25,24 @@ void KrOverlay::init() {
         grid_vertices.push_back(-(float)size * step); grid_vertices.push_back(0.0f); grid_vertices.push_back((float)i * step);
         grid_vertices.push_back((float)size * step);  grid_vertices.push_back(0.0f); grid_vertices.push_back((float)i * step);
     }
+    
+    // Thick subdivision lines at border limits / outer bounds (-10 and 10)
+    // To make it clear in flat GL_LINES without glLineWidth (deprecated/unsupported on some ES devices),
+    // we double render boundary subdivisions slightly offset.
+    for (float offset : {-10.0f, 0.0f, 10.0f}) {
+        // X Boundaries
+        grid_vertices.push_back(offset - 0.01f); grid_vertices.push_back(0.0f); grid_vertices.push_back(-10.0f);
+        grid_vertices.push_back(offset - 0.01f); grid_vertices.push_back(0.0f); grid_vertices.push_back(10.0f);
+        grid_vertices.push_back(offset + 0.01f); grid_vertices.push_back(0.0f); grid_vertices.push_back(-10.0f);
+        grid_vertices.push_back(offset + 0.01f); grid_vertices.push_back(0.0f); grid_vertices.push_back(10.0f);
+        
+        // Z Boundaries
+        grid_vertices.push_back(-10.0f); grid_vertices.push_back(0.0f); grid_vertices.push_back(offset - 0.01f);
+        grid_vertices.push_back(10.0f);  grid_vertices.push_back(0.0f); grid_vertices.push_back(offset - 0.01f);
+        grid_vertices.push_back(-10.0f); grid_vertices.push_back(0.0f); grid_vertices.push_back(offset + 0.01f);
+        grid_vertices.push_back(10.0f);  grid_vertices.push_back(0.0f); grid_vertices.push_back(offset + 0.01f);
+    }
+    
     grid_vertex_count = grid_vertices.size() / 3;
 
     glGenVertexArrays(1, &grid_vao);
@@ -34,12 +54,10 @@ void KrOverlay::init() {
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
     glEnableVertexAttribArray(0);
 
-    // Generate Axes (X: Red, Z: Blue)
-    // Eje X: Red line from (-10, 0, 0) to (10, 0, 0)
-    // Eje Z: Blue line from (0, 0, -10) to (0, 0, 10)
+    // Generate Axes (X: Red, Z: Blue) - Offset slightly to prevent depth fighting with grid lines
     float axis_vertices[] = {
-        -10.0f, 0.0f, 0.0f, 10.0f, 0.0f, 0.0f, // X
-         0.0f, 0.0f, -10.0f, 0.0f, 0.0f, 10.0f  // Z
+        -10.0f, 0.001f, 0.0f, 10.0f, 0.001f, 0.0f, // X
+         0.0f, 0.001f, -10.0f, 0.0f, 0.001f, 10.0f  // Z
     };
 
     glGenVertexArrays(1, &axis_vao);
@@ -62,20 +80,20 @@ void KrOverlay::render(GLuint program, const float* mvp_matrix) {
     
     glUniformMatrix4fv(mvp_loc, 1, GL_FALSE, mvp_matrix);
 
-    // Draw Grid (Gray)
-    glUniform4f(color_loc, 0.3f, 0.3f, 0.3f, 0.8f);
+    // Draw Grid (Gray - Blender Style)
+    glUniform4f(color_loc, 0.25f, 0.25f, 0.25f, 1.0f);
     glBindVertexArray(grid_vao);
     glDrawArrays(GL_LINES, 0, grid_vertex_count);
 
     // Draw Axis lines
     glBindVertexArray(axis_vao);
     
-    // Draw Axis X (Red)
-    glUniform4f(color_loc, 0.8f, 0.2f, 0.2f, 1.0f);
+    // Draw Axis X (Red Blender Style)
+    glUniform4f(color_loc, 0.8f, 0.15f, 0.15f, 1.0f);
     glDrawArrays(GL_LINES, 0, 2);
 
-    // Draw Axis Z (Blue)
-    glUniform4f(color_loc, 0.2f, 0.2f, 0.8f, 1.0f);
+    // Draw Axis Z (Blue Blender Style)
+    glUniform4f(color_loc, 0.15f, 0.15f, 0.8f, 1.0f);
     glDrawArrays(GL_LINES, 2, 2);
 
     glBindVertexArray(0);

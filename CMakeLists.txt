@@ -16,12 +16,14 @@ add_compile_options(
 add_compile_definitions(
     USE_NEON=1
     KRONOS_BENCHMARK=1
+    IMGUI_IMPL_OPENGL_ES3=1
 )
 
 # OpenGL ES 3.2 system dependency
 find_library(log-lib log)
 find_library(android-lib android)
 find_library(gles3-lib GLESv3)
+find_library(egl-lib EGL)
 
 # Include directories
 include_directories(
@@ -39,6 +41,12 @@ add_library(kronos3d_engine SHARED
     engine/render/viewport.cpp
     engine/render/shader.cpp
     engine/render/overlay.cpp
+    third_party/imgui/imgui.cpp
+    third_party/imgui/imgui_draw.cpp
+    third_party/imgui/imgui_tables.cpp
+    third_party/imgui/imgui_widgets.cpp
+    third_party/imgui/backends/imgui_impl_android.cpp
+    third_party/imgui/backends/imgui_impl_opengl3.cpp
 )
 
 # Link log, android, and openGL GLESv3 libraries
@@ -46,4 +54,5 @@ target_link_libraries(kronos3d_engine
     ${log-lib}
     ${android-lib}
     ${gles3-lib}
+    ${egl-lib}
 )

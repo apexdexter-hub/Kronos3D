@@ -33,15 +33,27 @@ const char* mesh_frag_src = R"(#version 300 es
 precision mediump float;
 in vec3 v_Normal;
 in vec3 v_FragPos;
+uniform vec3 u_CameraPos;
 out vec4 fragColor;
 void main() {
     vec3 lightDir = normalize(vec3(0.5, 1.0, 0.5));
     vec3 norm = normalize(v_Normal);
-    float ambient = 0.3;
+    vec3 baseColor = vec3(0.6, 0.6, 0.6);
+    
+    // Ambient
+    vec3 ambient = 0.25 * baseColor;
+    
+    // Diffuse
     float diff = max(dot(norm, lightDir), 0.0);
-    vec3 baseColor = vec3(0.7, 0.7, 0.7);
-    vec3 result = baseColor * (ambient + diff);
-    fragColor = vec4(result, 1.0);
+    vec3 diffuse = diff * baseColor;
+    
+    // Specular (Phong)
+    vec3 viewDir = normalize(u_CameraPos - v_FragPos);
+    vec3 reflectDir = reflect(-lightDir, norm);
+    float spec = pow(max(dot(viewDir, reflectDir), 0.0), 32.0);
+    vec3 specular = 0.15 * vec3(1.0) * spec;
+    
+    fragColor = vec4(ambient + diffuse + specular, 1.0);
 })";
 
 const char* overlay_vert_src = R"(#version 300 es
@@ -59,7 +71,11 @@ void main() {
     fragColor = u_Color;
 })";
 
-// Render resources
+#include <imgui.h>
+#include <backends/imgui_impl_android.h>
+#include <backends/imgui_impl_opengl3.h>
+
+// Camera/View parameters (Fase 2)
 static KrCamera camera;
 static KrMesh mesh;
 static KrOverlay overlay;
@@ -76,7 +92,10 @@ static int screen_height = 720;
 
 // Stats metrics
 static float current_fps = 0.0f;
+static float frame_time_ms = 0.0f;
 static auto last_frame_time = std::chrono::high_resolution_clock::now();
+
+static bool imgui_initialized = false;
 
 extern "C" JNIEXPORT void JNICALL
 Java_com_kronos3d_GLSurfaceManager_nativeInit(JNIEnv* env, jobject obj) {
@@ -115,6 +134,20 @@ Java_com_kronos3d_GLSurfaceManager_nativeInit(JNIEnv* env, jobject obj) {
     glEnableVertexAttribArray(1);
 
     glBindVertexArray(0);
+
+    // Init ImGui
+    if (!imgui_initialized) {
+        IMGUI_CHECKVERSION();
+        ImGui::CreateContext();
+        ImGuiIO& io = ImGui::GetIO();
+        io.IniFilename = nullptr; // Disable ini saving
+        
+        ImGui::StyleColorsDark();
+        
+        ImGui_ImplAndroid_Init(nullptr); // No native window required for basic rendering
+        ImGui_ImplOpenGL3_Init("#version 300 es");
+        imgui_initialized = true;
+    }
 }
 
 extern "C" JNIEXPORT void JNICALL
@@ -122,6 +155,7 @@ Java_com_kronos3d_GLSurfaceManager_nativeResize(JNIEnv* env, jobject obj, jint w
     screen_width = width;
     screen_height = height;
     glViewport(0, 0, width, height);
+    ImGui::GetIO().DisplaySize = ImVec2((float)width, (float)height);
 }
 
 extern "C" JNIEXPORT void JNICALL
@@ -130,7 +164,8 @@ Java_com_kronos3d_GLSurfaceManager_nativeRender(JNIEnv* env, jobject obj) {
     auto current_time = std::chrono::high_resolution_clock::now();
     std::chrono::duration<float> delta = current_time - last_frame_time;
     last_frame_time = current_time;
-    current_fps = 1.0f / delta.count();
+    frame_time_ms = delta.count() * 1000.0f;
+    current_fps = (delta.count() > 0.0f) ? (1.0f / delta.count()) : 60.0f;
 
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
@@ -158,16 +193,44 @@ Java_com_kronos3d_GLSurfaceManager_nativeRender(JNIEnv* env, jobject obj) {
     glUseProgram(mesh_program);
     GLint mvp_loc = glGetUniformLocation(mesh_program, "u_MVP");
     GLint model_loc = glGetUniformLocation(mesh_program, "u_Model");
+    GLint cam_pos_loc = glGetUniformLocation(mesh_program, "u_CameraPos");
 
     glUniformMatrix4fv(mvp_loc, 1, GL_FALSE, glm::value_ptr(mvp));
     glUniformMatrix4fv(model_loc, 1, GL_FALSE, glm::value_ptr(model));
+    glUniform3f(cam_pos_loc, camera_pos.x, camera_pos.y, camera_pos.z);
 
     glBindVertexArray(cube_vao);
     glDrawElements(GL_TRIANGLES, mesh.faces.size() * 3, GL_UNSIGNED_INT, 0);
     glBindVertexArray(0);
 
-    // Logging stats or debugging
-    // HUD overlay display (Fase 2 UI integration will render stats onto overlay_ui)
+    // 3. Draw ImGui HUD overlay
+    if (imgui_initialized) {
+        ImGui_ImplOpenGL3_NewFrame();
+        ImGui_ImplAndroid_NewFrame();
+        ImGui::NewFrame();
+
+        // Style window transparently
+        ImGui::SetNextWindowPos(ImVec2(10.0f, 10.0f), ImGuiCond_Always);
+        ImGui::SetNextWindowBgAlpha(0.35f);
+        
+        ImGui::Begin("Performance HUD", nullptr, 
+            ImGuiWindowFlags_NoTitleBar | 
+            ImGuiWindowFlags_NoResize | 
+            ImGuiWindowFlags_NoMove | 
+            ImGuiWindowFlags_NoCollapse | 
+            ImGuiWindowFlags_AlwaysAutoResize | 
+            ImGuiWindowFlags_NoSavedSettings);
+
+        ImGui::Text("FPS: %.1f", current_fps);
+        ImGui::Text("Ms: %.1f", frame_time_ms);
+        ImGui::Text("Verts: %d", (int)mesh.vertices.size());
+        ImGui::Text("Faces: %d", (int)mesh.faces.size());
+        
+        ImGui::End();
+
+        ImGui::Render();
+        ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+    }
 }
 
 extern "C" JNIEXPORT void JNICALL
