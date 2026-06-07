@@ -42,10 +42,10 @@ out vec4 fragColor;
 void main() {
     vec3 lightDir = normalize(vec3(0.5, 1.0, 0.5));
     vec3 norm = normalize(v_Normal);
-    vec3 baseColor = vec3(0.6, 0.6, 0.6);
+    vec3 baseColor = vec3(0.78, 0.78, 0.78);
     
     // Ambient
-    vec3 ambient = 0.25 * baseColor;
+    vec3 ambient = 0.35 * baseColor;
     
     // Diffuse
     float diff = max(dot(norm, lightDir), 0.0);
@@ -117,7 +117,7 @@ static std::vector<unsigned int> g_wire_indices;
 
 static void kr_mesh_rebuild_buffers() {
     glBindBuffer(GL_ARRAY_BUFFER, cube_vbo);
-    glBufferData(GL_ARRAY_BUFFER, mesh.vertices.size() * sizeof(KrVertex), mesh.vertices.data(), GL_STATIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, mesh.vertices.size() * sizeof(KrVertex), mesh.vertices.data(), GL_DYNAMIC_DRAW);
 
     g_indices.clear();
     g_wire_indices.clear();
@@ -142,10 +142,10 @@ static void kr_mesh_rebuild_buffers() {
     }
 
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, cube_ebo);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, g_indices.size() * sizeof(unsigned int), g_indices.data(), GL_STATIC_DRAW);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, g_indices.size() * sizeof(unsigned int), g_indices.data(), GL_DYNAMIC_DRAW);
     
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, wire_ebo);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, g_wire_indices.size() * sizeof(unsigned int), g_wire_indices.data(), GL_STATIC_DRAW);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, g_wire_indices.size() * sizeof(unsigned int), g_wire_indices.data(), GL_DYNAMIC_DRAW);
 }
 
 extern "C" JNIEXPORT void JNICALL
@@ -425,11 +425,13 @@ Java_com_kronos3d_GLSurfaceManager_nativeToggleEditMode(JNIEnv* env, jobject obj
 extern "C" JNIEXPORT void JNICALL
 Java_com_kronos3d_GLSurfaceManager_nativeSetToolSelect(JNIEnv* env, jobject obj) {
     current_tool_mode = TOOL_SELECT;
+    g_active_gizmo_axis = -1;
 }
 
 extern "C" JNIEXPORT void JNICALL
 Java_com_kronos3d_GLSurfaceManager_nativeSetToolMove(JNIEnv* env, jobject obj) {
     current_tool_mode = TOOL_MOVE;
+    g_active_gizmo_axis = -1;
 }
 
 extern "C" JNIEXPORT void JNICALL
