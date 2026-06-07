@@ -235,7 +235,10 @@ Java_com_kronos3d_GLSurfaceManager_nativeRender(JNIEnv* env, jobject obj) {
     glBindVertexArray(cube_vao);
     // Explicitly bind the correct index buffer to fix initial mangled shape
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, cube_ebo);
+    glEnable(GL_POLYGON_OFFSET_FILL);
+    glPolygonOffset(1.0f, 1.0f);
     glDrawElements(GL_TRIANGLES, g_indices.size(), GL_UNSIGNED_INT, 0);
+    glDisable(GL_POLYGON_OFFSET_FILL);
     glBindVertexArray(0);
 
     // Draw Selected Face highlight if applicable
