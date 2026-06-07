@@ -28,6 +28,35 @@ void kr_mesh_subdivide_face(KrMesh& mesh, int face_id) {
     bool is_quad = f.is_quad();
     int count = is_quad ? 4 : 3;
     unsigned int v[4] = {f.v0, f.v1, f.v2, f.v3};
+    unsigned int orig_vert_count = mesh.vertices.size();
+
+    // Helper lambda to find or create midpoints (avoid duplicates on shared edges)
+    auto find_midpoint = [&](unsigned int a, unsigned int b) -> unsigned int {
+        float ex = (mesh.vertices[a].x + mesh.vertices[b].x) * 0.5f;
+        float ey = (mesh.vertices[a].y + mesh.vertices[b].y) * 0.5f;
+        float ez = (mesh.vertices[a].z + mesh.vertices[b].z) * 0.5f;
+        // Search in vertices added during this subdivision pass to check if shared edge midpoint already exists
+        for (unsigned int i = orig_vert_count; i < mesh.vertices.size(); i++) {
+            KrVertex& m = mesh.vertices[i];
+            if (fabs(m.x - ex) < 0.0001f && fabs(m.y - ey) < 0.0001f && fabs(m.z - ez) < 0.0001f) {
+                return i;
+            }
+        }
+        KrVertex mv;
+        mv.x = ex;
+        mv.y = ey;
+        mv.z = ez;
+        mv.nx = (mesh.vertices[a].nx + mesh.vertices[b].nx) * 0.5f;
+        mv.ny = (mesh.vertices[a].ny + mesh.vertices[b].ny) * 0.5f;
+        mv.nz = (mesh.vertices[a].nz + mesh.vertices[b].nz) * 0.5f;
+        float m_len = glm::length(glm::vec3(mv.nx, mv.ny, mv.nz));
+        if (m_len > 0.0f) {
+            mv.nx /= m_len; mv.ny /= m_len; mv.nz /= m_len;
+        }
+        unsigned int idx = mesh.vertices.size();
+        mesh.vertices.push_back(mv);
+        return idx;
+    };
 
     // 1. Calculate Face Center
     KrVertex center;
@@ -56,21 +85,7 @@ void kr_mesh_subdivide_face(KrMesh& mesh, int face_id) {
     unsigned int mid[4]; // mid[0] is mid of (v0,v1), mid[1] is mid of (v1,v2), mid[2] is mid of (v2,v3), mid[3] is mid of (v3,v0)
     for (int i = 0; i < count; i++) {
         int next = (i + 1) % count;
-        KrVertex m;
-        m.x = (mesh.vertices[v[i]].x + mesh.vertices[v[next]].x) * 0.5f;
-        m.y = (mesh.vertices[v[i]].y + mesh.vertices[v[next]].y) * 0.5f;
-        m.z = (mesh.vertices[v[i]].z + mesh.vertices[v[next]].z) * 0.5f;
-        
-        m.nx = (mesh.vertices[v[i]].nx + mesh.vertices[v[next]].nx) * 0.5f;
-        m.ny = (mesh.vertices[v[i]].ny + mesh.vertices[v[next]].ny) * 0.5f;
-        m.nz = (mesh.vertices[v[i]].nz + mesh.vertices[v[next]].nz) * 0.5f;
-        float m_len = glm::length(glm::vec3(m.nx, m.ny, m.nz));
-        if (m_len > 0.0f) {
-            m.nx /= m_len; m.ny /= m_len; m.nz /= m_len;
-        }
-
-        mid[i] = mesh.vertices.size();
-        mesh.vertices.push_back(m);
+        mid[i] = find_midpoint(v[i], v[next]);
     }
 
     unsigned int idx_center = mesh.vertices.size();
@@ -125,10 +140,18 @@ void kr_mesh_extrude_face(KrMesh& mesh, int face_id, float distance) {
         mesh.vertices.push_back(evi);
     }
 
-    // 3. New cap face: nv0, nv1, nv2, nv3
-    mesh.faces[face_id] = {nv[0], nv[1], nv[2], nv[3]};
+    // 3. Keep original face at face_id as base.
+    // Update original base vertices' normals to point inwards (opposite of normal)
+    for (int i = 0; i < 4; i++) {
+        mesh.vertices[v[i]].nx = -normal.x;
+        mesh.vertices[v[i]].ny = -normal.y;
+        mesh.vertices[v[i]].nz = -normal.z;
+    }
 
-    // 4. Lateral faces (quads with flat normals)
+    // 4. Add new cap face: nv0, nv1, nv2, nv3
+    mesh.faces.push_back({nv[0], nv[1], nv[2], nv[3]});
+
+    // 5. Create 4 lateral faces (quads with flat normals)
     unsigned int orig_v[4] = {v[0], v[1], v[2], v[3]};
     unsigned int new_v[4] = {nv[0], nv[1], nv[2], nv[3]};
 

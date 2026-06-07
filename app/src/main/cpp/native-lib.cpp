@@ -38,26 +38,27 @@ precision mediump float;
 in vec3 v_Normal;
 in vec3 v_FragPos;
 uniform vec3 u_CameraPos;
-out vec4 fragColor;
+out vec4 FragColor;
 void main() {
-    vec3 lightDir = normalize(vec3(0.5, 1.0, 0.5));
-    vec3 norm = normalize(v_Normal);
     vec3 baseColor = vec3(0.85, 0.85, 0.85);
+    vec3 norm = normalize(v_Normal);
+    vec3 lightDir = normalize(vec3(0.5, 1.0, 0.5));
     
     // Ambient
     vec3 ambient = 0.4 * baseColor;
     
-    // Diffuse
+    // Diffuse suave
     float diff = max(dot(norm, lightDir), 0.0);
-    vec3 diffuse = diff * baseColor;
+    float diffSoft = diff * 0.5 + 0.5;
+    vec3 diffuse = diffSoft * baseColor * 0.6;
     
     // Specular
     vec3 viewDir = normalize(u_CameraPos - v_FragPos);
-    vec3 reflectDir = reflect(-lightDir, norm);
-    float spec = pow(max(dot(viewDir, reflectDir), 0.0), 16.0);
-    vec3 specular = 0.1 * vec3(1.0) * spec;
+    vec3 halfDir = normalize(lightDir + viewDir);
+    float spec = pow(max(dot(norm, halfDir), 0.0), 32.0);
+    vec3 specular = spec * vec3(0.1);
     
-    fragColor = vec4(ambient + diffuse + specular, 1.0);
+    FragColor = vec4(ambient + diffuse + specular, 1.0);
 })";
 
 const char* overlay_vert_src = R"(#version 300 es
@@ -296,7 +297,7 @@ Java_com_kronos3d_GLSurfaceManager_nativeRender(JNIEnv* env, jobject obj) {
 
     // Render 3D Translation Gizmo if we have selection
     if (selected_face_id != -1 || selected_vertex_id != -1) {
-        kr_gizmo_render(mesh, selected_vertex_id, selected_face_id, current_edit_mode, mvp, overlay_program);
+        kr_gizmo_render(mesh, selected_vertex_id, selected_face_id, current_edit_mode, mvp, overlay_program, camera.distance);
     }
 
     // Limit to 60 FPS maximum
@@ -438,8 +439,16 @@ extern "C" JNIEXPORT void JNICALL
 Java_com_kronos3d_GLSurfaceManager_nativeExtrude(JNIEnv* env, jobject obj) {
     if (current_edit_mode == EDIT_MODE && selected_face_id != -1) {
         kr_mesh_extrude_face(mesh, selected_face_id, 1.0f);
+        // Point selection to the newly added cap face
+        selected_face_id = mesh.faces.size() - 5; // 1 cap face + 4 side faces added. So cap index is total size - 5. Let's verify: size increases by 5 (1 cap + 4 side faces). The cap face is pushed right after vertices copy.
+        // Wait, mesh.faces.push_back(cap) is pushed before lateral faces are pushed in mesh_ops.cpp.
+        // So the cap index was size before lateral faces, which corresponds to the size of faces list before push_back(cap).
+        // Let's compute it accurately: the cap face index is (old_size), and then 4 lateral faces are appended.
+        // Thus, the cap index in the new faces array is: new_faces.size() - 5.
+        if ((int)mesh.faces.size() >= 5) {
+            selected_face_id = (int)mesh.faces.size() - 5;
+        }
         kr_mesh_rebuild_buffers();
-        // Keep the extruded face selected so the user can immediately drag it with the Gizmo
     }
 }
 

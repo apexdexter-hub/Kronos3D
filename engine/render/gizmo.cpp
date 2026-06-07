@@ -48,25 +48,19 @@ void kr_gizmo_down(const KrMesh& mesh, int selected_vertex_id, int selected_face
 
     glm::vec3 center = kr_gizmo_get_selection_center(mesh, selected_vertex_id, selected_face_id, edit_mode);
     
-    // Scale gizmo size to 0.6 to match render scale exactly and keep interaction precise
-    float scale = 0.6f;
+    // Scale gizmo size dynamically based on distance to camera
+    float scale = distance * 0.15f;
 
     glm::vec2 s_center = project_to_screen(center, mvp, screen_width, screen_height);
     glm::vec2 s_x = project_to_screen(center + glm::vec3(scale, 0.0f, 0.0f), mvp, screen_width, screen_height);
     glm::vec2 s_y = project_to_screen(center + glm::vec3(0.0f, scale, 0.0f), mvp, screen_width, screen_height);
     glm::vec2 s_z = project_to_screen(center + glm::vec3(0.0f, 0.0f, scale), mvp, screen_width, screen_height);
-
     glm::vec2 touch_pt(pixel_x, pixel_y);
-
-    // Distance to axis tips
     float dist_x = glm::distance(touch_pt, s_x);
     float dist_y = glm::distance(touch_pt, s_y);
     float dist_z = glm::distance(touch_pt, s_z);
-
-    // Click threshold in pixels
     const float threshold = 80.0f;
     float min_dist = threshold;
-
     if (dist_x < min_dist) { min_dist = dist_x; g_active_gizmo_axis = 0; }
     if (dist_y < min_dist) { min_dist = dist_y; g_active_gizmo_axis = 1; }
     if (dist_z < min_dist) { min_dist = dist_z; g_active_gizmo_axis = 2; }
@@ -176,7 +170,7 @@ bool kr_gizmo_drag(KrMesh& mesh, int selected_vertex_id, int selected_face_id, K
     return true;
 }
 
-void kr_gizmo_render(const KrMesh& mesh, int selected_vertex_id, int selected_face_id, KrEditMode edit_mode, const glm::mat4& mvp, GLuint overlay_program) {
+void kr_gizmo_render(const KrMesh& mesh, int selected_vertex_id, int selected_face_id, KrEditMode edit_mode, const glm::mat4& mvp, GLuint overlay_program, float distance) {
     if (selected_face_id == -1 && selected_vertex_id == -1) return;
 
     glDisable(GL_DEPTH_TEST);
@@ -187,20 +181,8 @@ void kr_gizmo_render(const KrMesh& mesh, int selected_vertex_id, int selected_fa
 
     glm::vec3 center = kr_gizmo_get_selection_center(mesh, selected_vertex_id, selected_face_id, edit_mode);
 
-    // Compute dynamic gizmo scale based on projection matrix properties
-    // Scale gizmo size with camera distance, matching down/drag scale exactly
-    float model_view_dist = 5.0f; // fallback
-    // Extract camera distance from MVP or use an approximation/passed value.
-    // Let's compute it by reading the inverse view matrix or using eye vector. Since mvp is passed:
-    // Let's use a simpler heuristic or a clean dynamic scale.
-    // If we look at how kr_gizmo_down is called, it passes camera.distance.
-    // In render, we can approximate distance by looking at center to camera distance or using a scale factor.
-    // Let's compute scale dynamically so that it matches down:
-    float scale = 0.6f;
-    // We can also extract camera position from mvp or calculate it. Let's make it look clean:
-    // 0.15 * camera.distance. In typical viewport elevation/azimuth camera.distance starts at 5.0.
-    // So 0.15 * 5.0 = 0.75. Let's make it a constant scale of 0.6f for visual consistency,
-    // and match the same scale = 0.6f in gizmo_down!
+    // Compute dynamic gizmo scale matching click selection scale exactly
+    float scale = distance * 0.15f;
 
 
     // Draw X axis (Red)

@@ -47,9 +47,14 @@ int kr_mesh_raycast(
     const float* ray_dir_in) 
 {
     glm::mat4 model = glm::make_mat4(model_matrix);
-    
-    glm::vec3 ray_origin = glm::make_vec3(ray_origin_in);
-    glm::vec3 ray_dir = glm::make_vec3(ray_dir_in);
+    glm::mat4 modelInv = glm::inverse(model);
+
+    glm::vec3 ray_origin_world = glm::make_vec3(ray_origin_in);
+    glm::vec3 ray_dir_world = glm::make_vec3(ray_dir_in);
+
+    // Transform ray to local object space
+    glm::vec3 ray_origin = glm::vec3(modelInv * glm::vec4(ray_origin_world, 1.0f));
+    glm::vec3 ray_dir = glm::normalize(glm::vec3(modelInv * glm::vec4(ray_dir_world, 0.0f)));
 
     float min_t = std::numeric_limits<float>::max();
     int hit_face_idx = -1;
@@ -57,16 +62,16 @@ int kr_mesh_raycast(
     for (size_t i = 0; i < mesh.faces.size(); ++i) {
         const KrFace& f = mesh.faces[i];
         
-        // Transform vertices to world coordinates
-        glm::vec3 v0 = glm::vec3(model * glm::vec4(mesh.vertices[f.v0].x, mesh.vertices[f.v0].y, mesh.vertices[f.v0].z, 1.0f));
-        glm::vec3 v1 = glm::vec3(model * glm::vec4(mesh.vertices[f.v1].x, mesh.vertices[f.v1].y, mesh.vertices[f.v1].z, 1.0f));
-        glm::vec3 v2 = glm::vec3(model * glm::vec4(mesh.vertices[f.v2].x, mesh.vertices[f.v2].y, mesh.vertices[f.v2].z, 1.0f));
+        // Use vertices directly in local coordinates
+        glm::vec3 v0(mesh.vertices[f.v0].x, mesh.vertices[f.v0].y, mesh.vertices[f.v0].z);
+        glm::vec3 v1(mesh.vertices[f.v1].x, mesh.vertices[f.v1].y, mesh.vertices[f.v1].z);
+        glm::vec3 v2(mesh.vertices[f.v2].x, mesh.vertices[f.v2].y, mesh.vertices[f.v2].z);
 
         float t = 0.0f;
         bool hit = ray_triangle_intersect(ray_origin, ray_dir, v0, v1, v2, t);
         
         if (!hit && f.is_quad()) {
-            glm::vec3 v3 = glm::vec3(model * glm::vec4(mesh.vertices[f.v3].x, mesh.vertices[f.v3].y, mesh.vertices[f.v3].z, 1.0f));
+            glm::vec3 v3(mesh.vertices[f.v3].x, mesh.vertices[f.v3].y, mesh.vertices[f.v3].z);
             hit = ray_triangle_intersect(ray_origin, ray_dir, v0, v2, v3, t);
         }
 
