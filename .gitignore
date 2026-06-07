@@ -1,0 +1,24 @@
+# .gitignore for Kronos3D Project
+.gradle/
+build/
+app/build/
+engine/build/
+release/
+*.apk
+*.so
+*.aar
+.cxx/
+local.properties
+.idea/
+*.iml
+*.ipr
+*.iws
+.DS_Store
+/captures/
+.externalNativeBuild
+.navigation
+/third_party/glm/
+/third_party/imgui/
+/third_party/assimp/
+/third_party/mobileglues/
+/refs/
