@@ -24,10 +24,11 @@ echo "🧹 Cache limpiado"
 echo "📁 Output dir: $OUTPUT_DIR"
 mkdir -p "$OUTPUT_DIR"
 
-# Clean old APKs
+# Clean old APKs and signatures
 if ls "$OUTPUT_DIR"/*.apk 2>/dev/null; then
     echo "🗑️ Eliminando APK anterior..."
     rm -f "$OUTPUT_DIR"/*.apk
+    rm -f "$OUTPUT_DIR"/*.idsig
 fi
 
 # Build
