@@ -144,26 +144,16 @@ bool kr_gizmo_drag(KrMesh& mesh, int selected_vertex_id, int selected_face_id, K
             }
         } else if (selected_face_id != -1 && selected_face_id < (int)mesh.faces.size()) {
             const KrFace& f = mesh.faces[selected_face_id];
-            glm::vec3 target_pos_v0(mesh.vertices[f.v0].x, mesh.vertices[f.v0].y, mesh.vertices[f.v0].z);
-            glm::vec3 target_pos_v1(mesh.vertices[f.v1].x, mesh.vertices[f.v1].y, mesh.vertices[f.v1].z);
-            glm::vec3 target_pos_v2(mesh.vertices[f.v2].x, mesh.vertices[f.v2].y, mesh.vertices[f.v2].z);
-            glm::vec3 target_pos_v3(0.0f);
-            if (f.is_quad()) target_pos_v3 = glm::vec3(mesh.vertices[f.v3].x, mesh.vertices[f.v3].y, mesh.vertices[f.v3].z);
+            unsigned int face_v[4] = {f.v0, f.v1, f.v2, f.v3};
+            int count = f.is_quad() ? 4 : 3;
             
-            for (auto& v : mesh.vertices) {
-                glm::vec3 curr(v.x, v.y, v.z);
-                bool match = (glm::distance(curr, target_pos_v0) < 0.0001f ||
-                              glm::distance(curr, target_pos_v1) < 0.0001f ||
-                              glm::distance(curr, target_pos_v2) < 0.0001f);
-                if (!match && f.is_quad() && glm::distance(curr, target_pos_v3) < 0.0001f) {
-                    match = true;
-                }
-                
-                if (match) {
-                    v.x += delta.x;
-                    v.y += delta.y;
-                    v.z += delta.z;
-                }
+            // To ensure we move shared vertices without duplication or drift,
+            // we gather the exact indices of the vertices that define this face.
+            // Move those vertices.
+            for (int i = 0; i < count; i++) {
+                mesh.vertices[face_v[i]].x += delta.x;
+                mesh.vertices[face_v[i]].y += delta.y;
+                mesh.vertices[face_v[i]].z += delta.z;
             }
         }
     }

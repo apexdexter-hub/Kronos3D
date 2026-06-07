@@ -181,3 +181,10 @@ void kr_mesh_extrude_face(KrMesh& mesh, int face_id, float distance) {
         mesh.faces.push_back({final_l_idx[0], final_l_idx[1], final_l_idx[2], final_l_idx[3]});
     }
 }
+
+void kr_mesh_subdivide_all(KrMesh& mesh) {
+    int faceCount = mesh.faces.size();
+    for (int i = 0; i < faceCount; i++) {
+        kr_mesh_subdivide_face(mesh, i);
+    }
+}

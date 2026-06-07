@@ -454,10 +454,9 @@ Java_com_kronos3d_GLSurfaceManager_nativeExtrude(JNIEnv* env, jobject obj) {
 
 extern "C" JNIEXPORT void JNICALL
 Java_com_kronos3d_GLSurfaceManager_nativeSubdivide(JNIEnv* env, jobject obj) {
-    if (current_edit_mode == EDIT_MODE && selected_face_id != -1) {
-        kr_mesh_subdivide_face(mesh, selected_face_id);
+    if (current_edit_mode == EDIT_MODE) {
+        kr_mesh_subdivide_all(mesh);
         kr_mesh_rebuild_buffers();
-        // Keep selected to allow further manipulation
     }
 }
 

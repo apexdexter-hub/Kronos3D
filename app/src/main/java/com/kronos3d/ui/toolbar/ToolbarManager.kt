@@ -3,6 +3,7 @@ package com.kronos3d.ui.toolbar
 import android.content.Context
 import android.graphics.Color
 import android.graphics.drawable.GradientDrawable
+import android.view.View
 import android.widget.Button
 import android.widget.LinearLayout
 import com.kronos3d.ui.KronosGLSurfaceView
@@ -14,18 +15,26 @@ class ToolbarManager(private val context: Context, private val glView: KronosGLS
         setPadding(15, 15, 15, 15)
     }
 
-    private var editButton: Button? = null
-    private var selButton: Button? = null
-    private var movButton: Button? = null
-    private var extButton: Button? = null
-    private var subButton: Button? = null
-
-    // Track active mode/tool in Kotlin for UI highlight
     private var isEditMode = false
     private var activeTool = "SEL" // "SEL" or "MOV"
 
+    // Layout panels for each mode
+    private val objectModeLayout = LinearLayout(context).apply {
+        orientation = LinearLayout.VERTICAL
+    }
+
+    private val editModeLayout = LinearLayout(context).apply {
+        orientation = LinearLayout.VERTICAL
+    }
+
     init {
-        setupButtons()
+        setupObjectModeButtons()
+        setupEditModeButtons()
+        
+        view.addView(objectModeLayout)
+        view.addView(editModeLayout)
+        
+        updateVisibility()
     }
 
     private fun getNormalDrawable(): GradientDrawable {
@@ -46,34 +55,21 @@ class ToolbarManager(private val context: Context, private val glView: KronosGLS
         }
     }
 
-    private fun updateButtonStyles() {
+    private fun updateVisibility() {
         view.post {
-            editButton?.background = if (isEditMode) getActiveDrawable() else getNormalDrawable()
-            editButton?.text = if (isEditMode) "✏️ OBJ" else "✏️ EDIT"
-
-            selButton?.background = if (activeTool == "SEL") getActiveDrawable() else getNormalDrawable()
-            movButton?.background = if (activeTool == "MOV") getActiveDrawable() else getNormalDrawable()
-
-            // Update sub operations visually (alpha 0.3 when OBJ mode) and disable clicks
-            val meshOpsAlpha = if (isEditMode) 1.0f else 0.3f
-            val meshOpsEnabled = isEditMode
-
-            selButton?.alpha = meshOpsAlpha
-            selButton?.isEnabled = meshOpsEnabled
-
-            movButton?.alpha = meshOpsAlpha
-            movButton?.isEnabled = meshOpsEnabled
-
-            extButton?.alpha = meshOpsAlpha
-            extButton?.isEnabled = meshOpsEnabled
-
-            subButton?.alpha = meshOpsAlpha
-            subButton?.isEnabled = meshOpsEnabled
+            if (isEditMode) {
+                objectModeLayout.visibility = View.GONE
+                editModeLayout.visibility = View.VISIBLE
+            } else {
+                objectModeLayout.visibility = View.VISIBLE
+                editModeLayout.visibility = View.GONE
+            }
         }
     }
 
-    private fun setupButtons() {
-        editButton = Button(context).apply {
+    private fun setupObjectModeButtons() {
+        // [EDIT] -> enter edit mode
+        val editBtn = Button(context).apply {
             text = "✏️ EDIT"
             setTextColor(Color.WHITE)
             background = getNormalDrawable()
@@ -84,32 +80,15 @@ class ToolbarManager(private val context: Context, private val glView: KronosGLS
             setOnClickListener {
                 glView.queueEvent {
                     glView.renderer.nativeToggleEditMode()
-                    isEditMode = !isEditMode
-                    updateButtonStyles()
+                    isEditMode = true
+                    updateVisibility()
                 }
             }
         }
-        view.addView(editButton)
+        objectModeLayout.addView(editBtn)
 
-        selButton = Button(context).apply {
-            text = "🔲 SEL"
-            setTextColor(Color.WHITE)
-            background = getActiveDrawable() // SEL starts active
-            textSize = 13f
-            layoutParams = LinearLayout.LayoutParams(140, 100).apply {
-                setMargins(0, 8, 0, 8)
-            }
-            setOnClickListener {
-                glView.queueEvent {
-                    glView.renderer.nativeSetToolSelect()
-                    activeTool = "SEL"
-                    updateButtonStyles()
-                }
-            }
-        }
-        view.addView(selButton)
-
-        movButton = Button(context).apply {
+        // [MOV] -> move whole object (drag view orbit is disabled or maps to object shift)
+        val movBtn = Button(context).apply {
             text = "↔️ MOV"
             setTextColor(Color.WHITE)
             background = getNormalDrawable()
@@ -121,32 +100,41 @@ class ToolbarManager(private val context: Context, private val glView: KronosGLS
                 glView.queueEvent {
                     glView.renderer.nativeSetToolMove()
                     activeTool = "MOV"
-                    updateButtonStyles()
                 }
             }
         }
-        view.addView(movButton)
+        objectModeLayout.addView(movBtn)
 
-        extButton = createActionButton("⬆️ EXT") { glView.renderer.nativeExtrude() }
-        view.addView(extButton)
+        // [ROT] -> rotate whole object
+        val rotBtn = Button(context).apply {
+            text = "🔄 ROT"
+            setTextColor(Color.WHITE)
+            background = getNormalDrawable()
+            textSize = 13f
+            layoutParams = LinearLayout.LayoutParams(140, 100).apply {
+                setMargins(0, 8, 0, 8)
+            }
+            // Logic for rot can be added later or kept as selector
+        }
+        objectModeLayout.addView(rotBtn)
 
-        subButton = createActionButton("➕ SUB") { glView.renderer.nativeSubdivide() }
-        view.addView(subButton)
-
-        view.addView(createActionButton("🔄 RST") {
-            glView.renderer.nativeResetMesh()
-            isEditMode = false
-            activeTool = "SEL"
-            updateButtonStyles()
-        })
-
-        // Apply initial styles
-        updateButtonStyles()
+        // [SCL] -> scale whole object
+        val sclBtn = Button(context).apply {
+            text = "📐 SCL"
+            setTextColor(Color.WHITE)
+            background = getNormalDrawable()
+            textSize = 13f
+            layoutParams = LinearLayout.LayoutParams(140, 100).apply {
+                setMargins(0, 8, 0, 8)
+            }
+        }
+        objectModeLayout.addView(sclBtn)
     }
 
-    private fun createActionButton(label: String, action: () -> Unit): Button {
-        return Button(context).apply {
-            text = label
+    private fun setupEditModeButtons() {
+        // [OBJ] -> enter object mode
+        val objBtn = Button(context).apply {
+            text = "📦 OBJ"
             setTextColor(Color.WHITE)
             background = getNormalDrawable()
             textSize = 13f
@@ -154,8 +142,85 @@ class ToolbarManager(private val context: Context, private val glView: KronosGLS
                 setMargins(0, 8, 0, 8)
             }
             setOnClickListener {
-                glView.queueEvent { action() }
+                glView.queueEvent {
+                    glView.renderer.nativeToggleEditMode()
+                    isEditMode = false
+                    updateVisibility()
+                }
             }
         }
+        editModeLayout.addView(objBtn)
+
+        // [SEL] -> select tool
+        val selBtn = Button(context).apply {
+            text = "🔲 SEL"
+            setTextColor(Color.WHITE)
+            background = getActiveDrawable()
+            textSize = 13f
+            layoutParams = LinearLayout.LayoutParams(140, 100).apply {
+                setMargins(0, 8, 0, 8)
+            }
+            setOnClickListener {
+                glView.queueEvent {
+                    glView.renderer.nativeSetToolSelect()
+                    activeTool = "SEL"
+                }
+            }
+        }
+        editModeLayout.addView(selBtn)
+
+        // [SUB] -> subdivide ALL faces
+        val subBtn = Button(context).apply {
+            text = "➕ SUB"
+            setTextColor(Color.WHITE)
+            background = getNormalDrawable()
+            textSize = 13f
+            layoutParams = LinearLayout.LayoutParams(140, 100).apply {
+                setMargins(0, 8, 0, 8)
+            }
+            setOnClickListener {
+                glView.queueEvent {
+                    glView.renderer.nativeSubdivide()
+                }
+            }
+        }
+        editModeLayout.addView(subBtn)
+
+        // [EXT] -> extrude selected face
+        val extBtn = Button(context).apply {
+            text = "⬆️ EXT"
+            setTextColor(Color.WHITE)
+            background = getNormalDrawable()
+            textSize = 13f
+            layoutParams = LinearLayout.LayoutParams(140, 100).apply {
+                setMargins(0, 8, 0, 8)
+            }
+            setOnClickListener {
+                glView.queueEvent {
+                    glView.renderer.nativeExtrude()
+                }
+            }
+        }
+        editModeLayout.addView(extBtn)
+
+        // [RST] -> reset original mesh
+        val rstBtn = Button(context).apply {
+            text = "🔄 RST"
+            setTextColor(Color.WHITE)
+            background = getNormalDrawable()
+            textSize = 13f
+            layoutParams = LinearLayout.LayoutParams(140, 100).apply {
+                setMargins(0, 8, 0, 8)
+            }
+            setOnClickListener {
+                glView.queueEvent {
+                    glView.renderer.nativeResetMesh()
+                    isEditMode = false
+                    activeTool = "SEL"
+                    updateVisibility()
+                }
+            }
+        }
+        editModeLayout.addView(rstBtn)
     }
 }

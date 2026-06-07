@@ -41,6 +41,7 @@ int kr_mesh_raycast(const KrMesh& mesh, const float* model_matrix, const float* 
 
 // Operators
 void kr_mesh_subdivide_face(KrMesh& mesh, int face_id);
+void kr_mesh_subdivide_all(KrMesh& mesh);
 void kr_mesh_extrude_face(KrMesh& mesh, int face_id, float distance);
 void kr_mesh_move_vertex(KrMesh& mesh, int vertex_id, float dx, float dz);
 
