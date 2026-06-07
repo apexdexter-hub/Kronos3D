@@ -25,9 +25,9 @@ class GLSurfaceManager : GLSurfaceView.Renderer {
     }
 
     // JNI Native methods
-    private native fun nativeInit()
-    private native fun nativeResize(width: Int, height: Int)
-    private native fun nativeRender()
+    private external fun nativeInit()
+    private external fun nativeResize(width: Int, height: Int)
+    private external fun nativeRender()
     
     // Touch handler delegates
     external fun nativeOrbit(dx: Float, dy: Float)

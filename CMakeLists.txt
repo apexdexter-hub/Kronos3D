@@ -25,6 +25,7 @@ find_library(gles3-lib GLESv3)
 
 # Include directories
 include_directories(
+    .
     app/src/main/cpp
     third_party/glm
     third_party/imgui
