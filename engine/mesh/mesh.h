@@ -3,48 +3,58 @@
 
 #include <vector>
 #include <atomic>
+#include <cstdint>
 
-struct KrVertex {
-    float x, y, z;
-    float nx, ny, nz;
+constexpr uint32_t KR_NULL_INDEX = 0xFFFFFFFF;
+
+struct alignas(16) KrVertex {
+    float co[3];
+    float no[3];
+    uint32_t he;
+    uint32_t flag;
 };
 
-struct KrFace {
-    unsigned int v0, v1, v2, v3;
-    KrFace() : v0(0), v1(0), v2(0), v3((unsigned int)-1) {}
-    KrFace(unsigned int a, unsigned int b, unsigned int c) : v0(a), v1(b), v2(c), v3((unsigned int)-1) {}
-    KrFace(unsigned int a, unsigned int b, unsigned int c, unsigned int d) : v0(a), v1(b), v2(c), v3(d) {}
-    bool is_quad() const { return v3 != (unsigned int)-1; }
+struct alignas(16) KrEdge {
+    uint32_t v1, v2;
+    uint32_t he;
+    uint32_t flag;
+};
+
+struct alignas(16) KrHalfEdge {
+    uint32_t v;
+    uint32_t e;
+    uint32_t f;
+    uint32_t next;
+    uint32_t prev;
+    uint32_t twin;
+    uint32_t _pad[2];
+};
+
+struct alignas(16) KrFace {
+    uint32_t he_first;
+    uint32_t len;
+    float no[3];
+    uint32_t flag;
+    uint32_t _pad[2];
 };
 
 struct KrMesh {
     std::vector<KrVertex> vertices;
+    std::vector<KrEdge> edges;
+    std::vector<KrHalfEdge> half_edges;
     std::vector<KrFace> faces;
     bool isDirty = false;
 };
 
-enum KrEditMode {
-    OBJECT_MODE,
-    EDIT_MODE
-};
+enum KrEditMode { OBJECT_MODE, EDIT_MODE };
+enum KrToolMode { TOOL_SELECT, TOOL_MOVE, TOOL_ROTATE, TOOL_SCALE, TOOL_EXTRUDE, TOOL_SUBDIVIDE };
 
-enum KrToolMode {
-    TOOL_SELECT,
-    TOOL_MOVE,
-    TOOL_EXTRUDE,
-    TOOL_SUBDIVIDE
-};
-
-// Generates a Phong-lit cube with distinct normals per face (24 vertices, 12 triangles)
 KrMesh kr_mesh_create_cube();
-
-// Raycast: returns selected face index or -1 if no face is hit
-int kr_mesh_raycast(const KrMesh& mesh, const float* model_matrix, const float* view_matrix, const float* projection_matrix, const float* ray_origin, const float* ray_dir);
-
-// Operators
+int kr_mesh_raycast(const KrMesh& mesh, const float* model, const float* view, const float* proj, const float* ro, const float* rd);
 void kr_mesh_subdivide_face(KrMesh& mesh, int face_id);
 void kr_mesh_subdivide_all(KrMesh& mesh);
 void kr_mesh_extrude_face(KrMesh& mesh, int face_id, float distance);
 void kr_mesh_move_vertex(KrMesh& mesh, int vertex_id, float dx, float dz);
+std::vector<float> kr_mesh_to_render_buffer(KrMesh& mesh);
 
-#endif // KRONOS_MESH_H
+#endif

@@ -39,6 +39,8 @@ class GLSurfaceManager : GLSurfaceView.Renderer {
     external fun nativeToggleEditMode()
     external fun nativeSetToolSelect()
     external fun nativeSetToolMove()
+    external fun nativeSetToolRotate()
+    external fun nativeSetToolScale()
     external fun nativeExtrude()
     external fun nativeSubdivide()
     external fun nativeResetMesh()

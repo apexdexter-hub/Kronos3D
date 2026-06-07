@@ -88,6 +88,8 @@ static GLuint overlay_program = 0;
 static GLuint cube_vao = 0;
 static GLuint cube_vbo = 0;
 static GLuint cube_ebo = 0;
+static GLuint wire_vao = 0;
+static GLuint wire_vbo = 0;
 static GLuint wire_ebo = 0;
 
 static int screen_width = 1280;
@@ -117,35 +119,22 @@ static void kr_mesh_rebuild_buffers();
 static std::vector<unsigned int> g_indices;
 static std::vector<unsigned int> g_wire_indices;
 
+static std::vector<float> g_render_buffer;
 static void kr_mesh_rebuild_buffers() {
+    g_render_buffer = kr_mesh_to_render_buffer(mesh);
     glBindBuffer(GL_ARRAY_BUFFER, cube_vbo);
+    glBufferData(GL_ARRAY_BUFFER, g_render_buffer.size() * sizeof(float), g_render_buffer.data(), GL_DYNAMIC_DRAW);
+
+    glBindBuffer(GL_ARRAY_BUFFER, wire_vbo);
     glBufferData(GL_ARRAY_BUFFER, mesh.vertices.size() * sizeof(KrVertex), mesh.vertices.data(), GL_DYNAMIC_DRAW);
 
-    g_indices.clear();
     g_wire_indices.clear();
-    for (const auto& f : mesh.faces) {
-        g_indices.push_back(f.v0);
-        g_indices.push_back(f.v1);
-        g_indices.push_back(f.v2);
-        
-        g_wire_indices.push_back(f.v0); g_wire_indices.push_back(f.v1);
-        g_wire_indices.push_back(f.v1); g_wire_indices.push_back(f.v2);
-        
-        if (f.is_quad()) {
-            g_indices.push_back(f.v0);
-            g_indices.push_back(f.v2);
-            g_indices.push_back(f.v3);
-            
-            g_wire_indices.push_back(f.v2); g_wire_indices.push_back(f.v3);
-            g_wire_indices.push_back(f.v3); g_wire_indices.push_back(f.v0);
-        } else {
-            g_wire_indices.push_back(f.v2); g_wire_indices.push_back(f.v0);
+    for (const auto& e : mesh.edges) {
+        if(e.flag != 1) {
+            g_wire_indices.push_back(e.v1);
+            g_wire_indices.push_back(e.v2);
         }
     }
-
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, cube_ebo);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, g_indices.size() * sizeof(unsigned int), g_indices.data(), GL_DYNAMIC_DRAW);
-    
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, wire_ebo);
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, g_wire_indices.size() * sizeof(unsigned int), g_wire_indices.data(), GL_DYNAMIC_DRAW);
 }
@@ -169,20 +158,25 @@ Java_com_kronos3d_GLSurfaceManager_nativeInit(JNIEnv* env, jobject obj) {
     glGenVertexArrays(1, &cube_vao);
     glGenBuffers(1, &cube_vbo);
     glGenBuffers(1, &cube_ebo);
+    glGenVertexArrays(1, &wire_vao);
+    glGenBuffers(1, &wire_vbo);
     glGenBuffers(1, &wire_ebo);
-
-    glBindVertexArray(cube_vao);
 
     kr_mesh_rebuild_buffers();
 
-    // Position attribute
+    glBindVertexArray(cube_vao);
+    glBindBuffer(GL_ARRAY_BUFFER, cube_vbo);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 24, (void*)0);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 24, (void*)(3 * sizeof(float)));
+    glEnableVertexAttribArray(1);
+    glBindVertexArray(0);
+
+    glBindVertexArray(wire_vao);
+    glBindBuffer(GL_ARRAY_BUFFER, wire_vbo);
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(KrVertex), (void*)0);
     glEnableVertexAttribArray(0);
-
-    // Normal attribute
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(KrVertex), (void*)(3 * sizeof(float)));
-    glEnableVertexAttribArray(1);
-
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, wire_ebo);
     glBindVertexArray(0);
 }
 
@@ -245,7 +239,7 @@ Java_com_kronos3d_GLSurfaceManager_nativeRender(JNIEnv* env, jobject obj) {
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, cube_ebo);
     glEnable(GL_POLYGON_OFFSET_FILL);
     glPolygonOffset(1.0f, 1.0f);
-    glDrawElements(GL_TRIANGLES, g_indices.size(), GL_UNSIGNED_INT, 0);
+    glDrawArrays(GL_TRIANGLES, 0, g_render_buffer.size() / 6);
     glDisable(GL_POLYGON_OFFSET_FILL);
     glBindVertexArray(0);
 
@@ -263,9 +257,9 @@ Java_com_kronos3d_GLSurfaceManager_nativeRender(JNIEnv* env, jobject obj) {
         int idx_offset = 0;
         int count = 0;
         for (int i = 0; i < selected_face_id; ++i) {
-            idx_offset += mesh.faces[i].is_quad() ? 6 : 3;
+            idx_offset += mesh.faces[i].len == 4 ? 6 : 3;
         }
-        count = mesh.faces[selected_face_id].is_quad() ? 6 : 3;
+        count = mesh.faces[selected_face_id].len == 4 ? 6 : 3;
         
         glDrawElements(GL_TRIANGLES, count, GL_UNSIGNED_INT, (void*)(idx_offset * sizeof(unsigned int)));
         glBindVertexArray(0);
@@ -278,20 +272,19 @@ Java_com_kronos3d_GLSurfaceManager_nativeRender(JNIEnv* env, jobject obj) {
         GLint overlay_color_loc = glGetUniformLocation(overlay_program, "u_Color");
         glUniformMatrix4fv(overlay_mvp_loc, 1, GL_FALSE, glm::value_ptr(mvp));
 
-        glBindVertexArray(cube_vao);
+        glBindVertexArray(wire_vao);
 
         // 1. Draw Edges as wireframe lines (White)
+        glLineWidth(3.0f);
         glUniform4f(overlay_color_loc, 1.0f, 1.0f, 1.0f, 0.8f);
-        // Draw using line list without diagonals
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, wire_ebo);
         glDrawElements(GL_LINES, g_wire_indices.size(), GL_UNSIGNED_INT, 0);
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, cube_ebo); // restore normal index buffer
+        glLineWidth(1.0f);
 
         // 2. Draw Vertices as white points (White)
         glUniform4f(overlay_color_loc, 1.0f, 1.0f, 1.0f, 1.0f);
         glDrawArrays(GL_POINTS, 0, mesh.vertices.size());
 
-        // Highlight selected vertex if TOOL_MOVE is active
+        // Highlight selected vertex
         if (selected_vertex_id != -1 && selected_vertex_id < (int)mesh.vertices.size()) {
             glUniform4f(overlay_color_loc, 1.0f, 0.5f, 0.0f, 1.0f); // Orange vertex point
             glDrawArrays(GL_POINTS, selected_vertex_id, 1);
@@ -300,10 +293,8 @@ Java_com_kronos3d_GLSurfaceManager_nativeRender(JNIEnv* env, jobject obj) {
         glBindVertexArray(0);
     }
 
-    // Render 3D Translation Gizmo if we have selection
-    if (selected_face_id != -1 || selected_vertex_id != -1) {
-        kr_gizmo_render(mesh, selected_vertex_id, selected_face_id, current_edit_mode, mvp, overlay_program, camera.distance);
-    }
+    // Render 3D Translation Gizmo
+    kr_gizmo_render(mesh, selected_vertex_id, selected_face_id, current_edit_mode, current_tool_mode, mvp, overlay_program, camera.distance);
 
     // Limit to 60 FPS maximum
     const auto targetFrameTime = std::chrono::milliseconds(16);
@@ -314,8 +305,10 @@ Java_com_kronos3d_GLSurfaceManager_nativeRender(JNIEnv* env, jobject obj) {
 extern "C" JNIEXPORT void JNICALL
 Java_com_kronos3d_GLSurfaceManager_nativeOrbit(JNIEnv* env, jobject obj, jfloat dx, jfloat dy) {
     // Attempt dragging via Gizmo translation first
-    bool dragged = kr_gizmo_drag(mesh, selected_vertex_id, selected_face_id, current_edit_mode, dx, dy, screen_width, screen_height, camera.distance, camera.azimuth, camera.elevation);
-    if (!dragged) {
+    bool dragged = kr_gizmo_drag(mesh, selected_vertex_id, selected_face_id, current_edit_mode, current_tool_mode, dx, dy, screen_width, screen_height, camera.distance, camera.azimuth, camera.elevation);
+    if (dragged) {
+        kr_mesh_rebuild_buffers();
+    } else {
         if (current_tool_mode == TOOL_MOVE && current_edit_mode == EDIT_MODE && selected_vertex_id != -1) {
             // Fallback: Drag active selected vertex on horizontal XZ plane using dx and dy screen movement
             float scale = 0.005f * camera.distance;
@@ -377,7 +370,7 @@ Java_com_kronos3d_GLSurfaceManager_nativeTap(JNIEnv* env, jobject obj, jfloat pi
         int closest_vertex = -1;
         
         for (size_t i = 0; i < mesh.vertices.size(); ++i) {
-            glm::vec3 v_world = glm::vec3(model * glm::vec4(mesh.vertices[i].x, mesh.vertices[i].y, mesh.vertices[i].z, 1.0f));
+            glm::vec3 v_world = glm::vec3(model * glm::vec4(mesh.vertices[i].co[0], mesh.vertices[i].co[1], mesh.vertices[i].co[2], 1.0f));
             // Point to line distance
             glm::vec3 cross_prod = glm::cross(v_world - camera_pos, ray_world);
             float dist = glm::length(cross_prod);
@@ -409,7 +402,7 @@ Java_com_kronos3d_GLSurfaceManager_nativeGizmoDown(JNIEnv* env, jobject obj, jfl
     glm::mat4 model = glm::mat4(1.0f);
     glm::mat4 mvp = projection * view * model;
 
-    kr_gizmo_down(mesh, selected_vertex_id, selected_face_id, current_edit_mode, x, y, screen_width, screen_height, mvp, camera.distance, camera.azimuth, camera.elevation);
+    kr_gizmo_down(mesh, selected_vertex_id, selected_face_id, current_edit_mode, current_tool_mode, x, y, screen_width, screen_height, mvp, camera.distance, camera.azimuth, camera.elevation);
 }
 
 extern "C" JNIEXPORT void JNICALL
@@ -440,6 +433,18 @@ Java_com_kronos3d_GLSurfaceManager_nativeSetToolSelect(JNIEnv* env, jobject obj)
 extern "C" JNIEXPORT void JNICALL
 Java_com_kronos3d_GLSurfaceManager_nativeSetToolMove(JNIEnv* env, jobject obj) {
     current_tool_mode = TOOL_MOVE;
+    g_active_gizmo_axis = -1;
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_kronos3d_GLSurfaceManager_nativeSetToolRotate(JNIEnv* env, jobject obj) {
+    current_tool_mode = TOOL_ROTATE;
+    g_active_gizmo_axis = -1;
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_kronos3d_GLSurfaceManager_nativeSetToolScale(JNIEnv* env, jobject obj) {
+    current_tool_mode = TOOL_SCALE;
     g_active_gizmo_axis = -1;
 }
 

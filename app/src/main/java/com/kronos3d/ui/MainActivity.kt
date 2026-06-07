@@ -10,7 +10,8 @@ import android.view.Window
 import android.view.WindowManager
 import android.widget.FrameLayout
 import com.kronos3d.ui.hud.HudOverlay
-import com.kronos3d.ui.toolbar.ToolbarManager
+import com.kronos3d.ui.toolbar.ToolsToolbarManager
+import com.kronos3d.ui.toolbar.ModeSwitchManager
 
 class MainActivity : Activity() {
     private var glView: KronosGLSurfaceView? = null
@@ -50,15 +51,27 @@ class MainActivity : Activity() {
         }
         rootLayout.addView(hud.view)
 
-        val toolbar = ToolbarManager(this, surfaceView)
-        toolbar.view.layoutParams = FrameLayout.LayoutParams(
+        val toolsToolbar = ToolsToolbarManager(this, surfaceView)
+        toolsToolbar.view.layoutParams = FrameLayout.LayoutParams(
             FrameLayout.LayoutParams.WRAP_CONTENT,
             FrameLayout.LayoutParams.WRAP_CONTENT
         ).apply {
             gravity = Gravity.LEFT or Gravity.CENTER_VERTICAL
             setMargins(30, 0, 0, 0)
         }
-        rootLayout.addView(toolbar.view)
+        rootLayout.addView(toolsToolbar.view)
+
+        val modeSwitch = ModeSwitchManager(this, surfaceView) { isEditMode ->
+            toolsToolbar.setEditMode(isEditMode)
+        }
+        modeSwitch.view.layoutParams = FrameLayout.LayoutParams(
+            FrameLayout.LayoutParams.WRAP_CONTENT,
+            FrameLayout.LayoutParams.WRAP_CONTENT
+        ).apply {
+            gravity = Gravity.RIGHT or Gravity.TOP
+            setMargins(0, 30, 30, 0)
+        }
+        rootLayout.addView(modeSwitch.view)
 
         setContentView(rootLayout)
 

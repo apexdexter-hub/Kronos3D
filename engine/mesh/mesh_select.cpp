@@ -4,84 +4,51 @@
 #include <glm/gtc/type_ptr.hpp>
 #include <limits>
 
-// Helper to check intersection of ray with a triangle
-bool ray_triangle_intersect(
-    const glm::vec3& ray_origin, const glm::vec3& ray_dir,
-    const glm::vec3& v0, const glm::vec3& v1, const glm::vec3& v2,
-    float& t) 
-{
-    const float EPSILON = 0.0000001f;
-    glm::vec3 edge1 = v1 - v0;
-    glm::vec3 edge2 = v2 - v0;
-    glm::vec3 h = glm::cross(ray_dir, edge2);
-    float a = glm::dot(edge1, h);
-    if (a > -EPSILON && a < EPSILON)
-        return false; // Ray is parallel to this triangle.
-    
+bool ray_triangle_intersect(const glm::vec3& ro, const glm::vec3& rd, const glm::vec3& v0, const glm::vec3& v1, const glm::vec3& v2, float& t) {
+    glm::vec3 e1 = v1 - v0;
+    glm::vec3 e2 = v2 - v0;
+    glm::vec3 h = glm::cross(rd, e2);
+    float a = glm::dot(e1, h);
+    if(a > -0.00001f && a < 0.00001f) return false;
     float f = 1.0f / a;
-    glm::vec3 s = ray_origin - v0;
+    glm::vec3 s = ro - v0;
     float u = f * glm::dot(s, h);
-    if (u < 0.0f || u > 1.0f)
-        return false;
-        
-    glm::vec3 q = glm::cross(s, edge1);
-    float v = f * glm::dot(ray_dir, q);
-    if (v < 0.0f || u + v > 1.0f)
-        return false;
-        
-    // At this stage we can compute t to find out where the intersection point is on the line.
-    float temp_t = f * glm::dot(edge2, q);
-    if (temp_t > EPSILON) { // ray intersection
-        t = temp_t;
-        return true;
-    }
+    if(u < 0.0f || u > 1.0f) return false;
+    glm::vec3 q = glm::cross(s, e1);
+    float v = f * glm::dot(rd, q);
+    if(v < 0.0f || u + v > 1.0f) return false;
+    float tt = f * glm::dot(e2, q);
+    if(tt > 0.00001f){ t = tt; return true; }
     return false;
 }
 
-int kr_mesh_raycast(
-    const KrMesh& mesh, 
-    const float* model_matrix, 
-    const float* view_matrix, 
-    const float* projection_matrix, 
-    const float* ray_origin_in, 
-    const float* ray_dir_in) 
-{
-    glm::mat4 model = glm::make_mat4(model_matrix);
-    glm::mat4 modelInv = glm::inverse(model);
-
-    glm::vec3 ray_origin_world = glm::make_vec3(ray_origin_in);
-    glm::vec3 ray_dir_world = glm::make_vec3(ray_dir_in);
-
-    // Transform ray to local object space
-    glm::vec3 ray_origin = glm::vec3(modelInv * glm::vec4(ray_origin_world, 1.0f));
-    glm::vec3 ray_dir = glm::normalize(glm::vec3(modelInv * glm::vec4(ray_dir_world, 0.0f)));
+int kr_mesh_raycast(const KrMesh& mesh, const float* model, const float* view, const float* proj, const float* ro, const float* rd) {
+    glm::mat4 m = glm::make_mat4(model);
+    glm::mat4 mInv = glm::inverse(m);
+    glm::vec3 ro_w = glm::make_vec3(ro);
+    glm::vec3 rd_w = glm::make_vec3(rd);
+    glm::vec3 ro_l = glm::vec3(mInv * glm::vec4(ro_w, 1.0f));
+    glm::vec3 rd_l = glm::normalize(glm::vec3(mInv * glm::vec4(rd_w, 0.0f)));
 
     float min_t = std::numeric_limits<float>::max();
-    int hit_face_idx = -1;
-
-    for (size_t i = 0; i < mesh.faces.size(); ++i) {
-        const KrFace& f = mesh.faces[i];
-        
-        // Use vertices directly in local coordinates
-        glm::vec3 v0(mesh.vertices[f.v0].x, mesh.vertices[f.v0].y, mesh.vertices[f.v0].z);
-        glm::vec3 v1(mesh.vertices[f.v1].x, mesh.vertices[f.v1].y, mesh.vertices[f.v1].z);
-        glm::vec3 v2(mesh.vertices[f.v2].x, mesh.vertices[f.v2].y, mesh.vertices[f.v2].z);
-
-        float t = 0.0f;
-        bool hit = ray_triangle_intersect(ray_origin, ray_dir, v0, v1, v2, t);
-        
-        if (!hit && f.is_quad()) {
-            glm::vec3 v3(mesh.vertices[f.v3].x, mesh.vertices[f.v3].y, mesh.vertices[f.v3].z);
-            hit = ray_triangle_intersect(ray_origin, ray_dir, v0, v2, v3, t);
-        }
-
-        if (hit) {
-            if (t < min_t) {
-                min_t = t;
-                hit_face_idx = (int)i;
+    int hit = -1;
+    for(size_t i=0; i<mesh.faces.size(); i++){
+        if(mesh.faces[i].len < 3 || mesh.faces[i].flag == 1) continue;
+        uint32_t curr = mesh.faces[i].he_first;
+        uint32_t v0 = mesh.half_edges[mesh.half_edges[curr].prev].v;
+        glm::vec3 p0(mesh.vertices[v0].co[0], mesh.vertices[v0].co[1], mesh.vertices[v0].co[2]);
+        curr = mesh.half_edges[curr].next;
+        for(uint32_t j=1; j<mesh.faces[i].len-1; j++){
+            uint32_t v1 = mesh.half_edges[mesh.half_edges[curr].prev].v;
+            uint32_t v2 = mesh.half_edges[curr].v;
+            glm::vec3 p1(mesh.vertices[v1].co[0], mesh.vertices[v1].co[1], mesh.vertices[v1].co[2]);
+            glm::vec3 p2(mesh.vertices[v2].co[0], mesh.vertices[v2].co[1], mesh.vertices[v2].co[2]);
+            float t=0;
+            if(ray_triangle_intersect(ro_l, rd_l, p0, p1, p2, t)){
+                if(t < min_t){ min_t = t; hit = i; }
             }
+            curr = mesh.half_edges[curr].next;
         }
     }
-
-    return hit_face_idx;
+    return hit;
 }

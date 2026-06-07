@@ -39,3 +39,14 @@
   - **Extrude Operator**: Displaces selected face vertices outwards following face normal vectors and generates side segments.
   - **Vertex Movement**: Select-and-drag functionality translates vertices across horizontal XZ planes.
   - **Toolbar Controls**: Added vertical ImGui panels overlay providing SEL, MOV, EXT, SUB, RST, and Mode toggle hooks.
+
+---
+
+## Phase 4: Optimization & Gizmo Polish (Fase 4: Optimización y Rediseño de Gizmos)
+- **Status**: In Progress 🚧
+- **Completed Date**: N/A
+- **Verification**: In development.
+- **Key Features & Decisions**:
+  - **MobileGlues Optimization**: Integrated optimal low-level configurations directly into MobileGlues C++ fallback logic (`settings.cpp`) so that the developer build runs with optimal settings by default: OpenGL 4.3 target, ANGLE enabled, 128 MB GLSL Cache, Compute Shaders enabled, Direct State Access enabled, and `DrawElements` multi-draw emulation.
+  - **3D Gizmos Redesign**: Preparing implementation of translation (cones/arrows + planar quad indicators), scaling (boxes/cubes), and rotation (circular orientation rings) based on Blockbench's reference design.
+
