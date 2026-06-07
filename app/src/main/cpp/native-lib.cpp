@@ -211,14 +211,17 @@ Java_com_kronos3d_GLSurfaceManager_nativeRender(JNIEnv* env, jobject obj) {
 
         // Style window transparently
         ImGui::SetNextWindowPos(ImVec2(10.0f, 10.0f), ImGuiCond_Always);
-        ImGui::SetNextWindowBgAlpha(0.35f);
+        ImGui::SetNextWindowBgAlpha(0.6f);
+        ImGui::SetNextWindowSize(ImVec2(150.0f, 110.0f), ImGuiCond_Always);
+        
+        ImGuiIO& io = ImGui::GetIO();
+        io.FontGlobalScale = 1.5f; // larger HUD text
         
         ImGui::Begin("Performance HUD", nullptr, 
             ImGuiWindowFlags_NoTitleBar | 
             ImGuiWindowFlags_NoResize | 
             ImGuiWindowFlags_NoMove | 
             ImGuiWindowFlags_NoCollapse | 
-            ImGuiWindowFlags_AlwaysAutoResize | 
             ImGuiWindowFlags_NoSavedSettings);
 
         ImGui::Text("FPS: %.1f", current_fps);

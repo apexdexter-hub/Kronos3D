@@ -81,7 +81,7 @@ void KrOverlay::render(GLuint program, const float* mvp_matrix) {
     glUniformMatrix4fv(mvp_loc, 1, GL_FALSE, mvp_matrix);
 
     // Draw Grid (Gray - Blender Style)
-    glUniform4f(color_loc, 0.25f, 0.25f, 0.25f, 1.0f);
+    glUniform4f(color_loc, 0.2f, 0.2f, 0.2f, 1.0f);
     glBindVertexArray(grid_vao);
     glDrawArrays(GL_LINES, 0, grid_vertex_count);
 
@@ -89,11 +89,11 @@ void KrOverlay::render(GLuint program, const float* mvp_matrix) {
     glBindVertexArray(axis_vao);
     
     // Draw Axis X (Red Blender Style)
-    glUniform4f(color_loc, 0.8f, 0.15f, 0.15f, 1.0f);
+    glUniform4f(color_loc, 0.5f, 0.1f, 0.1f, 1.0f);
     glDrawArrays(GL_LINES, 0, 2);
 
     // Draw Axis Z (Blue Blender Style)
-    glUniform4f(color_loc, 0.15f, 0.15f, 0.8f, 1.0f);
+    glUniform4f(color_loc, 0.1f, 0.1f, 0.5f, 1.0f);
     glDrawArrays(GL_LINES, 2, 2);
 
     glBindVertexArray(0);
