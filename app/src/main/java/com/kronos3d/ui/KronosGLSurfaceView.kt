@@ -10,6 +10,15 @@ class KronosGLSurfaceView(context: Context) : GLSurfaceView(context) {
 
     init {
         setEGLContextClientVersion(3)
+        
+        // CRÍTICO: Permitir que Views de Android se rendericen encima
+        setZOrderOnTop(false)
+        setZOrderMediaOverlay(false)
+        
+        // Hacer el fondo transparente para compositing correcto
+        setEGLConfigChooser(8, 8, 8, 8, 16, 0)
+        holder.setFormat(android.graphics.PixelFormat.TRANSLUCENT)
+        
         renderer = GLSurfaceManager()
         setRenderer(renderer)
         renderMode = RENDERMODE_CONTINUOUSLY
