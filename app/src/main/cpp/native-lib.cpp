@@ -72,10 +72,6 @@ void main() {
     fragColor = u_Color;
 })";
 
-#include <imgui.h>
-#include <backends/imgui_impl_android.h>
-#include <backends/imgui_impl_opengl3.h>
-
 // Camera/View parameters (Fase 2)
 static KrCamera camera;
 static KrMesh mesh;
@@ -95,8 +91,6 @@ static int screen_height = 720;
 static float current_fps = 0.0f;
 static float frame_time_ms = 0.0f;
 static auto last_frame_time = std::chrono::high_resolution_clock::now();
-
-static bool imgui_initialized = false;
 
 // Edit & Tool modes
 static KrEditMode current_edit_mode = OBJECT_MODE;
@@ -158,20 +152,6 @@ Java_com_kronos3d_GLSurfaceManager_nativeInit(JNIEnv* env, jobject obj) {
     glEnableVertexAttribArray(1);
 
     glBindVertexArray(0);
-
-    // Init ImGui
-    if (!imgui_initialized) {
-        IMGUI_CHECKVERSION();
-        ImGui::CreateContext();
-        ImGuiIO& io = ImGui::GetIO();
-        io.IniFilename = nullptr; // Disable ini saving
-        
-        ImGui::StyleColorsDark();
-        
-        ImGui_ImplAndroid_Init(nullptr); // No native window required for basic rendering
-        ImGui_ImplOpenGL3_Init("#version 300 es");
-        imgui_initialized = true;
-    }
 }
 
 extern "C" JNIEXPORT void JNICALL
@@ -179,7 +159,6 @@ Java_com_kronos3d_GLSurfaceManager_nativeResize(JNIEnv* env, jobject obj, jint w
     screen_width = width;
     screen_height = height;
     glViewport(0, 0, width, height);
-    ImGui::GetIO().DisplaySize = ImVec2((float)width, (float)height);
 }
 
 extern "C" JNIEXPORT void JNICALL
@@ -270,99 +249,6 @@ Java_com_kronos3d_GLSurfaceManager_nativeRender(JNIEnv* env, jobject obj) {
 
         glBindVertexArray(0);
     }
-
-    // 3. Draw ImGui HUD overlay and toolbars
-    if (imgui_initialized) {
-        ImGui_ImplAndroid_NewFrame();
-        ImGui_ImplOpenGL3_NewFrame();
-        ImGui::NewFrame();
-
-        // Debug logging for toolbar rendering
-        __android_log_print(ANDROID_LOG_DEBUG, "Kronos3D", 
-            "Drawing toolbar, screen: %dx%d", screen_width, screen_height);
-
-        // Left Vertical Toolbar
-        ImGui::SetNextWindowPos(ImVec2(10.0f, 100.0f), ImGuiCond_Always);
-        ImGui::SetNextWindowSize(ImVec2(80.0f, 320.0f), ImGuiCond_Always);
-        ImGui::SetNextWindowBgAlpha(0.8f);
-
-        ImGuiIO& io = ImGui::GetIO();
-        io.FontGlobalScale = 1.3f;
-
-        ImGui::Begin("Tools", nullptr,
-            ImGuiWindowFlags_NoTitleBar |
-            ImGuiWindowFlags_NoResize |
-            ImGuiWindowFlags_NoMove |
-            ImGuiWindowFlags_NoCollapse |
-            ImGuiWindowFlags_NoSavedSettings);
-
-        // MODE SWITCH (EDIT/OBJ)
-        if (current_edit_mode == OBJECT_MODE) {
-            if (ImGui::Button("EDIT", ImVec2(60.0f, 45.0f))) {
-                current_edit_mode = EDIT_MODE;
-            }
-        } else {
-            if (ImGui::Button("OBJ", ImVec2(60.0f, 45.0f))) {
-                current_edit_mode = OBJECT_MODE;
-                selected_vertex_id = -1;
-                selected_face_id = -1;
-            }
-        }
-        ImGui::Separator();
-
-        // TOOLBAR BUTTONS
-        if (ImGui::Button("SEL", ImVec2(60.0f, 45.0f))) {
-            current_tool_mode = TOOL_SELECT;
-        }
-        if (ImGui::Button("MOV", ImVec2(60.0f, 45.0f))) {
-            current_tool_mode = TOOL_MOVE;
-        }
-        if (ImGui::Button("EXT", ImVec2(60.0f, 45.0f))) {
-            if (selected_face_id != -1) {
-                kr_mesh_extrude_face(mesh, selected_face_id, 0.5f);
-                kr_mesh_rebuild_buffers();
-                selected_face_id = -1; // reset selection
-            }
-        }
-        if (ImGui::Button("SUB", ImVec2(60.0f, 45.0f))) {
-            if (selected_face_id != -1) {
-                kr_mesh_subdivide_face(mesh, selected_face_id);
-                kr_mesh_rebuild_buffers();
-                selected_face_id = -1; // reset selection
-            }
-        }
-        ImGui::Separator();
-        if (ImGui::Button("RST", ImVec2(60.0f, 45.0f))) {
-            mesh = kr_mesh_create_cube();
-            kr_mesh_rebuild_buffers();
-            selected_face_id = -1;
-            selected_vertex_id = -1;
-        }
-
-        ImGui::End();
-
-        // Performance HUD (top left)
-        ImGui::SetNextWindowPos(ImVec2(10.0f, 10.0f), ImGuiCond_Always);
-        ImGui::SetNextWindowBgAlpha(0.6f);
-        ImGui::SetNextWindowSize(ImVec2(150.0f, 110.0f), ImGuiCond_Always);
-        
-        ImGui::Begin("Performance HUD", nullptr, 
-            ImGuiWindowFlags_NoTitleBar | 
-            ImGuiWindowFlags_NoResize | 
-            ImGuiWindowFlags_NoMove | 
-            ImGuiWindowFlags_NoCollapse | 
-            ImGuiWindowFlags_NoSavedSettings);
-
-        ImGui::Text("FPS: %.1f", current_fps);
-        ImGui::Text("Ms: %.1f", frame_time_ms);
-        ImGui::Text("Verts: %d", (int)mesh.vertices.size());
-        ImGui::Text("Faces: %d", (int)mesh.faces.size());
-        
-        ImGui::End();
-
-        ImGui::Render();
-        ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
-    }
 }
 
 extern "C" JNIEXPORT void JNICALL
@@ -437,4 +323,66 @@ Java_com_kronos3d_GLSurfaceManager_nativeTap(JNIEnv* env, jobject obj, jfloat no
         // Select face in OBJECT_MODE
         selected_face_id = kr_mesh_raycast(mesh, model_arr, view_arr, proj_arr, origin_arr, dir_arr);
     }
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_kronos3d_GLSurfaceManager_nativeToggleEditMode(JNIEnv* env, jobject obj) {
+    if (current_edit_mode == OBJECT_MODE) {
+        current_edit_mode = EDIT_MODE;
+    } else {
+        current_edit_mode = OBJECT_MODE;
+        selected_vertex_id = -1;
+        selected_face_id = -1;
+    }
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_kronos3d_GLSurfaceManager_nativeSetToolSelect(JNIEnv* env, jobject obj) {
+    current_tool_mode = TOOL_SELECT;
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_kronos3d_GLSurfaceManager_nativeSetToolMove(JNIEnv* env, jobject obj) {
+    current_tool_mode = TOOL_MOVE;
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_kronos3d_GLSurfaceManager_nativeExtrude(JNIEnv* env, jobject obj) {
+    if (selected_face_id != -1) {
+        kr_mesh_extrude_face(mesh, selected_face_id, 0.5f);
+        kr_mesh_rebuild_buffers();
+        selected_face_id = -1;
+    }
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_kronos3d_GLSurfaceManager_nativeSubdivide(JNIEnv* env, jobject obj) {
+    if (selected_face_id != -1) {
+        kr_mesh_subdivide_face(mesh, selected_face_id);
+        kr_mesh_rebuild_buffers();
+        selected_face_id = -1;
+    }
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_kronos3d_GLSurfaceManager_nativeResetMesh(JNIEnv* env, jobject obj) {
+    mesh = kr_mesh_create_cube();
+    kr_mesh_rebuild_buffers();
+    selected_face_id = -1;
+    selected_vertex_id = -1;
+}
+
+extern "C" JNIEXPORT jfloat JNICALL
+Java_com_kronos3d_GLSurfaceManager_nativeGetFPS(JNIEnv* env, jobject obj) {
+    return current_fps;
+}
+
+extern "C" JNIEXPORT jint JNICALL
+Java_com_kronos3d_GLSurfaceManager_nativeGetVertCount(JNIEnv* env, jobject obj) {
+    return (jint)mesh.vertices.size();
+}
+
+extern "C" JNIEXPORT jint JNICALL
+Java_com_kronos3d_GLSurfaceManager_nativeGetFaceCount(JNIEnv* env, jobject obj) {
+    return (jint)mesh.faces.size();
 }

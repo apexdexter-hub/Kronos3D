@@ -33,4 +33,15 @@ class GLSurfaceManager : GLSurfaceView.Renderer {
     external fun nativeOrbit(dx: Float, dy: Float)
     external fun nativeZoom(delta: Float)
     external fun nativeTap(normalizedX: Float, normalizedY: Float)
+
+    // Kotlin UI control & HUD query bridges
+    external fun nativeToggleEditMode()
+    external fun nativeSetToolSelect()
+    external fun nativeSetToolMove()
+    external fun nativeExtrude()
+    external fun nativeSubdivide()
+    external fun nativeResetMesh()
+    external fun nativeGetFPS(): Float
+    external fun nativeGetVertCount(): Int
+    external fun nativeGetFaceCount(): Int
 }

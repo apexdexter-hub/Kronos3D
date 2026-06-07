@@ -5,7 +5,7 @@ import android.opengl.GLSurfaceView
 import android.view.MotionEvent
 
 class KronosGLSurfaceView(context: Context) : GLSurfaceView(context) {
-    private val renderer: GLSurfaceManager
+    val renderer: GLSurfaceManager
 
     init {
         // Require OpenGL ES 3.2
