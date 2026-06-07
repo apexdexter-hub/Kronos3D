@@ -273,32 +273,36 @@ Java_com_kronos3d_GLSurfaceManager_nativeRender(JNIEnv* env, jobject obj) {
 
     // 3. Draw ImGui HUD overlay and toolbars
     if (imgui_initialized) {
-        ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplAndroid_NewFrame();
+        ImGui_ImplOpenGL3_NewFrame();
         ImGui::NewFrame();
 
+        // Debug logging for toolbar rendering
+        __android_log_print(ANDROID_LOG_DEBUG, "Kronos3D", 
+            "Drawing toolbar, screen: %dx%d", screen_width, screen_height);
+
         // Left Vertical Toolbar
-        ImGui::SetNextWindowPos(ImVec2(10.0f, 130.0f), ImGuiCond_Always);
-        ImGui::SetNextWindowBgAlpha(0.7f);
-        ImGui::SetNextWindowSize(ImVec2(100.0f, 320.0f), ImGuiCond_Always);
+        ImGui::SetNextWindowPos(ImVec2(10.0f, 100.0f), ImGuiCond_Always);
+        ImGui::SetNextWindowSize(ImVec2(80.0f, 320.0f), ImGuiCond_Always);
+        ImGui::SetNextWindowBgAlpha(0.8f);
 
         ImGuiIO& io = ImGui::GetIO();
         io.FontGlobalScale = 1.3f;
 
-        ImGui::Begin("Toolbar", nullptr,
+        ImGui::Begin("Tools", nullptr,
             ImGuiWindowFlags_NoTitleBar |
             ImGuiWindowFlags_NoResize |
             ImGuiWindowFlags_NoMove |
             ImGuiWindowFlags_NoCollapse |
             ImGuiWindowFlags_NoSavedSettings);
 
-        // MODE SWITCH
+        // MODE SWITCH (EDIT/OBJ)
         if (current_edit_mode == OBJECT_MODE) {
-            if (ImGui::Button("EDIT", ImVec2(80.0f, 35.0f))) {
+            if (ImGui::Button("EDIT", ImVec2(60.0f, 45.0f))) {
                 current_edit_mode = EDIT_MODE;
             }
         } else {
-            if (ImGui::Button("OBJ", ImVec2(80.0f, 35.0f))) {
+            if (ImGui::Button("OBJ", ImVec2(60.0f, 45.0f))) {
                 current_edit_mode = OBJECT_MODE;
                 selected_vertex_id = -1;
                 selected_face_id = -1;
@@ -307,20 +311,20 @@ Java_com_kronos3d_GLSurfaceManager_nativeRender(JNIEnv* env, jobject obj) {
         ImGui::Separator();
 
         // TOOLBAR BUTTONS
-        if (ImGui::Button("SEL", ImVec2(80.0f, 35.0f))) {
+        if (ImGui::Button("SEL", ImVec2(60.0f, 45.0f))) {
             current_tool_mode = TOOL_SELECT;
         }
-        if (ImGui::Button("MOV", ImVec2(80.0f, 35.0f))) {
+        if (ImGui::Button("MOV", ImVec2(60.0f, 45.0f))) {
             current_tool_mode = TOOL_MOVE;
         }
-        if (ImGui::Button("EXT", ImVec2(80.0f, 35.0f))) {
+        if (ImGui::Button("EXT", ImVec2(60.0f, 45.0f))) {
             if (selected_face_id != -1) {
                 kr_mesh_extrude_face(mesh, selected_face_id, 0.5f);
                 kr_mesh_rebuild_buffers();
                 selected_face_id = -1; // reset selection
             }
         }
-        if (ImGui::Button("SUB", ImVec2(80.0f, 35.0f))) {
+        if (ImGui::Button("SUB", ImVec2(60.0f, 45.0f))) {
             if (selected_face_id != -1) {
                 kr_mesh_subdivide_face(mesh, selected_face_id);
                 kr_mesh_rebuild_buffers();
@@ -328,7 +332,7 @@ Java_com_kronos3d_GLSurfaceManager_nativeRender(JNIEnv* env, jobject obj) {
             }
         }
         ImGui::Separator();
-        if (ImGui::Button("RST", ImVec2(80.0f, 35.0f))) {
+        if (ImGui::Button("RST", ImVec2(60.0f, 45.0f))) {
             mesh = kr_mesh_create_cube();
             kr_mesh_rebuild_buffers();
             selected_face_id = -1;
