@@ -51,15 +51,20 @@ class MainActivity : Activity() {
         }
         rootLayout.addView(hud.view)
 
-        val toolsToolbar = ToolsToolbarManager(this, surfaceView)
-        toolsToolbar.view.layoutParams = FrameLayout.LayoutParams(
-            FrameLayout.LayoutParams.WRAP_CONTENT,
-            FrameLayout.LayoutParams.WRAP_CONTENT
-        ).apply {
-            gravity = Gravity.LEFT or Gravity.CENTER_VERTICAL
-            setMargins(30, 0, 0, 0)
+        // Reposition toolbar to the right and wrap it in a ScrollView to prevent overflow issues
+        val scrollView = android.widget.ScrollView(this).apply {
+            isVerticalScrollBarEnabled = false
+            layoutParams = FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.WRAP_CONTENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            ).apply {
+                gravity = Gravity.RIGHT or Gravity.CENTER_VERTICAL
+                setMargins(0, 150, 30, 150) // Adjust top/bottom margins to clear modeSwitch view
+            }
         }
-        rootLayout.addView(toolsToolbar.view)
+        val toolsToolbar = ToolsToolbarManager(this, surfaceView)
+        scrollView.addView(toolsToolbar.view)
+        rootLayout.addView(scrollView)
 
         val modeSwitch = ModeSwitchManager(this, surfaceView) { isEditMode ->
             toolsToolbar.setEditMode(isEditMode)

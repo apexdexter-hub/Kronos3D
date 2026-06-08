@@ -43,7 +43,7 @@ class GLSurfaceManager : GLSurfaceView.Renderer {
     external fun nativeSetToolScale()
     external fun nativeExtrude()
     external fun nativeSubdivide()
-    external fun nativeResetMesh()
+    external fun nativeUndo()
     external fun nativeGetFPS(): Float
     external fun nativeGetVertCount(): Int
     external fun nativeGetFaceCount(): Int
@@ -51,4 +51,5 @@ class GLSurfaceManager : GLSurfaceView.Renderer {
     external fun nativeLoadMesh()
     external fun nativeGizmoDown(x: Float, y: Float)
     external fun nativeGizmoUp()
+    external fun nativeCycleLightColor()
 }

@@ -43,10 +43,17 @@
 ---
 
 ## Phase 4: Optimization & Gizmo Polish (Fase 4: Optimización y Rediseño de Gizmos)
-- **Status**: In Progress 🚧
-- **Completed Date**: N/A
-- **Verification**: In development.
+- **Status**: Completed ✅
+- **Completed Date**: 2026-06-08
+- **Verification**: Built and verified `Kronos3D-fase4-Premium UI and Safe Save support.apk` successfully.
 - **Key Features & Decisions**:
-  - **MobileGlues Optimization**: Integrated optimal low-level configurations directly into MobileGlues C++ fallback logic (`settings.cpp`) so that the developer build runs with optimal settings by default: OpenGL 4.3 target, ANGLE enabled, 128 MB GLSL Cache, Compute Shaders enabled, Direct State Access enabled, and `DrawElements` multi-draw emulation.
-  - **3D Gizmos Redesign**: Preparing implementation of translation (cones/arrows + planar quad indicators), scaling (boxes/cubes), and rotation (circular orientation rings) based on Blockbench's reference design.
+  - **OpenGL ES 3.2 Direct Rendering**: Clarified that MobileGlues (which maps Desktop GL to GL ES) is not linked or active; the engine compiles and links directly to native OpenGL ES 3.2 (`GLESv3` library) via Android NDK for high-performance direct rendering.
+  - **Premium UI & Layout**: Relocated the toolbar to the right, wrapped it in a vertical `ScrollView` to prevent offscreen button overflows, and removed all emojis to maintain a sleek, premium design.
+  - **Circular Antialiased Vertices**: Replaced square point rendering with a custom shader (`vtx_program`) that uses distance fields to draw clean, antialiased circular vertices with subtle dark borders.
+  - **Gizmo 3D Redesign**: Redesigned 3D gizmos in `gizmo.cpp` with cones (translation), cubes (scaling), and circular orientation rings (rotation) matching Blockbench/Nomad Sculpt.
+  - **Undo History (RST → UNDO)**: Replaced the Reset button with a JNI-backed `nativeUndo()` command, reading from a circular 30-level mesh history stack (`g_undo_stack`).
+  - **Startup Crash Protection**: Added binary file size and metadata verification in `nativeLoadMesh()` to detect legacy autosave formats and cleanly fallback to the default cube, preventing application crashes on startup.
+  - **Interactive Light Ball**: Added a spatial Light Ball ("luz de bolita") in the scene that can be selected (50px screen-space radius) and translated via the 3D Gizmo. Its color cycles via the JNI-linked `LT COLOR` button.
+  - **Selector-to-Gizmo Integration**: Enabled translation gizmo manipulation directly in the Selector (`TOOL_SELECT`) mode, allowing immediate manipulation of selected vertices, faces, or the Light Ball.
+  - **Optimized Vertex Math**: Implemented screen-space pixel-distance calculations (45px selection threshold) for high-precision vertex tapping, fixing interaction failures and missing input guards.
 

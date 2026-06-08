@@ -14,7 +14,7 @@ int g_active_gizmo_axis = -1;
 static float g_gizmo_last_x = 0;
 static float g_gizmo_last_y = 0;
 
-static glm::vec2 project_to_screen(const glm::vec3& world_pos, const glm::mat4& mvp, int width, int height) {
+glm::vec2 project_to_screen(const glm::vec3& world_pos, const glm::mat4& mvp, int width, int height) {
     glm::vec4 clip_pos = mvp * glm::vec4(world_pos, 1.0f);
     if (clip_pos.w == 0.0f) return glm::vec2(0.0f);
     glm::vec3 ndc = glm::vec3(clip_pos) / clip_pos.w;
@@ -24,6 +24,9 @@ static glm::vec2 project_to_screen(const glm::vec3& world_pos, const glm::mat4& 
 }
 
 glm::vec3 kr_gizmo_get_selection_center(const KrMesh& mesh, int selected_vertex_id, int selected_face_id, KrEditMode edit_mode) {
+    if (g_light_selected) {
+        return g_light_pos;
+    }
     if (edit_mode == OBJECT_MODE) {
         glm::vec3 sum(0.0f);
         for (const auto& v : mesh.vertices) {
@@ -32,38 +35,66 @@ glm::vec3 kr_gizmo_get_selection_center(const KrMesh& mesh, int selected_vertex_
         if (!mesh.vertices.empty()) sum /= (float)mesh.vertices.size();
         return sum;
     }
-    if (edit_mode == EDIT_MODE && selected_vertex_id != -1 && selected_vertex_id < (int)mesh.vertices.size()) {
-        return glm::vec3(mesh.vertices[selected_vertex_id].co[0], mesh.vertices[selected_vertex_id].co[1], mesh.vertices[selected_vertex_id].co[2]);
-    } else if (selected_face_id != -1 && selected_face_id < (int)mesh.faces.size()) {
-        const KrFace& f = mesh.faces[selected_face_id];
+    if (edit_mode == EDIT_MODE) {
         glm::vec3 sum(0.0f);
-        uint32_t curr = f.he_first;
-        for (uint32_t i = 0; i < f.len; ++i) {
-            uint32_t v_idx = mesh.half_edges[mesh.half_edges[curr].prev].v;
-            sum += glm::vec3(mesh.vertices[v_idx].co[0], mesh.vertices[v_idx].co[1], mesh.vertices[v_idx].co[2]);
-            curr = mesh.half_edges[curr].next;
+        int count = 0;
+        for (const auto& v : mesh.vertices) {
+            if (v.flag == 1) {
+                sum += glm::vec3(v.co[0], v.co[1], v.co[2]);
+                count++;
+            }
         }
-        return sum / (float)f.len;
+        if (count > 0) return sum / (float)count;
+
+        if (selected_vertex_id != -1 && selected_vertex_id < (int)mesh.vertices.size()) {
+            return glm::vec3(mesh.vertices[selected_vertex_id].co[0], mesh.vertices[selected_vertex_id].co[1], mesh.vertices[selected_vertex_id].co[2]);
+        } else if (selected_face_id != -1 && selected_face_id < (int)mesh.faces.size()) {
+            const KrFace& f = mesh.faces[selected_face_id];
+            glm::vec3 sum_f(0.0f);
+            uint32_t curr = f.he_first;
+            for (uint32_t i = 0; i < f.len; ++i) {
+                uint32_t v_idx = mesh.half_edges[mesh.half_edges[curr].prev].v;
+                sum_f += glm::vec3(mesh.vertices[v_idx].co[0], mesh.vertices[v_idx].co[1], mesh.vertices[v_idx].co[2]);
+                curr = mesh.half_edges[curr].next;
+            }
+            return sum_f / (float)f.len;
+        }
     }
     return glm::vec3(0.0f);
 }
 
 glm::mat3 kr_gizmo_get_local_orientation(const KrMesh& mesh, int selected_vertex_id, int selected_face_id, KrEditMode edit_mode) {
+    if (g_light_selected) {
+        return glm::mat3(1.0f);
+    }
     glm::vec3 normal(0.0f, 1.0f, 0.0f); 
     if (edit_mode == OBJECT_MODE) return glm::mat3(1.0f);
-    if (edit_mode == EDIT_MODE && selected_vertex_id != -1 && selected_vertex_id < (int)mesh.vertices.size()) {
-        const auto& v = mesh.vertices[selected_vertex_id];
-        normal = glm::normalize(glm::vec3(v.no[0], v.no[1], v.no[2]));
-    } else if (selected_face_id != -1 && selected_face_id < (int)mesh.faces.size()) {
-        const KrFace& f = mesh.faces[selected_face_id];
-        uint32_t curr = f.he_first;
-        uint32_t v0_idx = mesh.half_edges[mesh.half_edges[curr].prev].v;
-        uint32_t v1_idx = mesh.half_edges[curr].v;
-        uint32_t v2_idx = mesh.half_edges[mesh.half_edges[curr].next].v;
-        glm::vec3 v0(mesh.vertices[v0_idx].co[0], mesh.vertices[v0_idx].co[1], mesh.vertices[v0_idx].co[2]);
-        glm::vec3 v1(mesh.vertices[v1_idx].co[0], mesh.vertices[v1_idx].co[1], mesh.vertices[v1_idx].co[2]);
-        glm::vec3 v2(mesh.vertices[v2_idx].co[0], mesh.vertices[v2_idx].co[1], mesh.vertices[v2_idx].co[2]);
-        normal = glm::normalize(glm::cross(v1 - v0, v2 - v0));
+    if (edit_mode == EDIT_MODE) {
+        glm::vec3 sum_no(0.0f);
+        int count = 0;
+        for (const auto& v : mesh.vertices) {
+            if (v.flag == 1) {
+                sum_no += glm::vec3(v.no[0], v.no[1], v.no[2]);
+                count++;
+            }
+        }
+        if (count > 0) {
+            normal = glm::normalize(sum_no);
+            if (glm::length(normal) < 0.01f) normal = glm::vec3(0.0f, 1.0f, 0.0f);
+        } else if (selected_vertex_id != -1 && selected_vertex_id < (int)mesh.vertices.size()) {
+            const auto& v = mesh.vertices[selected_vertex_id];
+            normal = glm::normalize(glm::vec3(v.no[0], v.no[1], v.no[2]));
+        } else if (selected_face_id != -1 && selected_face_id < (int)mesh.faces.size()) {
+            const KrFace& f = mesh.faces[selected_face_id];
+            uint32_t curr = f.he_first;
+            uint32_t v0_idx = mesh.half_edges[mesh.half_edges[curr].prev].v;
+            uint32_t v1_idx = mesh.half_edges[curr].v;
+            uint32_t v2_idx = mesh.half_edges[mesh.half_edges[curr].next].v;
+            glm::vec3 v0(mesh.vertices[v0_idx].co[0], mesh.vertices[v0_idx].co[1], mesh.vertices[v0_idx].co[2]);
+            glm::vec3 v1(mesh.vertices[v1_idx].co[0], mesh.vertices[v1_idx].co[1], mesh.vertices[v1_idx].co[2]);
+            glm::vec3 v2(mesh.vertices[v2_idx].co[0], mesh.vertices[v2_idx].co[1], mesh.vertices[v2_idx].co[2]);
+            normal = glm::normalize(glm::cross(v1 - v0, v2 - v0));
+        }
     }
     glm::vec3 up = (std::abs(normal.y) < 0.999f) ? glm::vec3(0.0f, 1.0f, 0.0f) : glm::vec3(1.0f, 0.0f, 0.0f);
     glm::vec3 tangent = glm::normalize(glm::cross(up, normal));
@@ -224,8 +255,22 @@ static void draw_circle(const glm::vec3& center, const glm::mat3& orientation, i
 }
 
 void kr_gizmo_down(const KrMesh& mesh, int selected_vertex_id, int selected_face_id, KrEditMode edit_mode, KrToolMode tool_mode, float pixel_x, float pixel_y, int screen_width, int screen_height, const glm::mat4& mvp, float distance, float azimuth, float elevation) {
+    if (tool_mode == TOOL_SELECT) {
+        tool_mode = TOOL_MOVE;
+    }
     g_active_gizmo_axis = -1;
-    if (edit_mode == EDIT_MODE && selected_face_id == -1 && selected_vertex_id == -1) return;
+    if (edit_mode == EDIT_MODE) {
+        bool has_selection = false;
+        for (const auto& v : mesh.vertices) {
+            if (v.flag == 1) {
+                has_selection = true;
+                break;
+            }
+        }
+        if (!has_selection && selected_vertex_id == -1 && selected_face_id == -1 && !g_light_selected) return;
+    } else {
+        // In OBJECT_MODE, allow dragging the mesh origin center freely without selection guards
+    }
 
     g_gizmo_last_x = pixel_x;
     g_gizmo_last_y = pixel_y;
@@ -333,6 +378,9 @@ void kr_gizmo_down(const KrMesh& mesh, int selected_vertex_id, int selected_face
 }
 
 bool kr_gizmo_drag(KrMesh& mesh, int selected_vertex_id, int selected_face_id, KrEditMode edit_mode, KrToolMode tool_mode, float dx, float dy, int screen_width, int screen_height, float distance, float azimuth, float elevation) {
+    if (tool_mode == TOOL_SELECT) {
+        tool_mode = TOOL_MOVE;
+    }
     if (g_active_gizmo_axis == -1) return false;
 
     glm::vec3 center = kr_gizmo_get_selection_center(mesh, selected_vertex_id, selected_face_id, edit_mode);
@@ -497,20 +545,33 @@ bool kr_gizmo_drag(KrMesh& mesh, int selected_vertex_id, int selected_face_id, K
             delta = drag_dir * displacement;
         }
 
-        if (edit_mode == EDIT_MODE) {
-            if (selected_vertex_id != -1 && selected_vertex_id < (int)mesh.vertices.size()) {
-                mesh.vertices[selected_vertex_id].co[0] += delta.x;
-                mesh.vertices[selected_vertex_id].co[1] += delta.y;
-                mesh.vertices[selected_vertex_id].co[2] += delta.z;
-            } else if (selected_face_id != -1 && selected_face_id < (int)mesh.faces.size()) {
-                KrFace& f = mesh.faces[selected_face_id];
-                uint32_t curr = f.he_first;
-                for (uint32_t i = 0; i < f.len; ++i) {
-                    uint32_t v_idx = mesh.half_edges[mesh.half_edges[curr].prev].v;
-                    mesh.vertices[v_idx].co[0] += delta.x;
-                    mesh.vertices[v_idx].co[1] += delta.y;
-                    mesh.vertices[v_idx].co[2] += delta.z;
-                    curr = mesh.half_edges[curr].next;
+        if (g_light_selected) {
+            g_light_pos += delta;
+        } else if (edit_mode == EDIT_MODE) {
+            bool moved_selection = false;
+            for (auto& v : mesh.vertices) {
+                if (v.flag == 1) {
+                    v.co[0] += delta.x;
+                    v.co[1] += delta.y;
+                    v.co[2] += delta.z;
+                    moved_selection = true;
+                }
+            }
+            if (!moved_selection) {
+                if (selected_vertex_id != -1 && selected_vertex_id < (int)mesh.vertices.size()) {
+                    mesh.vertices[selected_vertex_id].co[0] += delta.x;
+                    mesh.vertices[selected_vertex_id].co[1] += delta.y;
+                    mesh.vertices[selected_vertex_id].co[2] += delta.z;
+                } else if (selected_face_id != -1 && selected_face_id < (int)mesh.faces.size()) {
+                    KrFace& f = mesh.faces[selected_face_id];
+                    uint32_t curr = f.he_first;
+                    for (uint32_t i = 0; i < f.len; ++i) {
+                        uint32_t v_idx = mesh.half_edges[mesh.half_edges[curr].prev].v;
+                        mesh.vertices[v_idx].co[0] += delta.x;
+                        mesh.vertices[v_idx].co[1] += delta.y;
+                        mesh.vertices[v_idx].co[2] += delta.z;
+                        curr = mesh.half_edges[curr].next;
+                    }
                 }
             }
         } else if (edit_mode == OBJECT_MODE) {
@@ -547,15 +608,24 @@ bool kr_gizmo_drag(KrMesh& mesh, int selected_vertex_id, int selected_face_id, K
         };
 
         if (edit_mode == EDIT_MODE) {
-            if (selected_vertex_id != -1 && selected_vertex_id < (int)mesh.vertices.size()) {
-                apply_scale(mesh.vertices[selected_vertex_id].co);
-            } else if (selected_face_id != -1 && selected_face_id < (int)mesh.faces.size()) {
-                KrFace& f = mesh.faces[selected_face_id];
-                uint32_t curr = f.he_first;
-                for (uint32_t i = 0; i < f.len; ++i) {
-                    uint32_t v_idx = mesh.half_edges[mesh.half_edges[curr].prev].v;
-                    apply_scale(mesh.vertices[v_idx].co);
-                    curr = mesh.half_edges[curr].next;
+            bool scaled_selection = false;
+            for (auto& v : mesh.vertices) {
+                if (v.flag == 1) {
+                    apply_scale(v.co);
+                    scaled_selection = true;
+                }
+            }
+            if (!scaled_selection) {
+                if (selected_vertex_id != -1 && selected_vertex_id < (int)mesh.vertices.size()) {
+                    apply_scale(mesh.vertices[selected_vertex_id].co);
+                } else if (selected_face_id != -1 && selected_face_id < (int)mesh.faces.size()) {
+                    KrFace& f = mesh.faces[selected_face_id];
+                    uint32_t curr = f.he_first;
+                    for (uint32_t i = 0; i < f.len; ++i) {
+                        uint32_t v_idx = mesh.half_edges[mesh.half_edges[curr].prev].v;
+                        apply_scale(mesh.vertices[v_idx].co);
+                        curr = mesh.half_edges[curr].next;
+                    }
                 }
             }
         } else if (edit_mode == OBJECT_MODE) {
@@ -568,7 +638,21 @@ bool kr_gizmo_drag(KrMesh& mesh, int selected_vertex_id, int selected_face_id, K
 }
 
 void kr_gizmo_render(const KrMesh& mesh, int selected_vertex_id, int selected_face_id, KrEditMode edit_mode, KrToolMode tool_mode, const glm::mat4& mvp, GLuint overlay_program, float distance) {
-    if (edit_mode == EDIT_MODE && selected_face_id == -1 && selected_vertex_id == -1) return;
+    if (tool_mode == TOOL_SELECT) {
+        tool_mode = TOOL_MOVE;
+    }
+    if (edit_mode == EDIT_MODE) {
+        bool has_selection = false;
+        for (const auto& v : mesh.vertices) {
+            if (v.flag == 1) {
+                has_selection = true;
+                break;
+            }
+        }
+        if (!has_selection && selected_vertex_id == -1 && selected_face_id == -1 && !g_light_selected) return;
+    } else {
+        // In OBJECT_MODE, we show the Gizmo at the object's origin center regardless of selection to allow full body transformations
+    }
 
     glDisable(GL_DEPTH_TEST);
     glUseProgram(overlay_program);

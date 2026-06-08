@@ -13,12 +13,17 @@ GLuint kr_shader_compile(GLenum type, const char* source) {
     GLint success;
     glGetShaderiv(shader, GL_COMPILE_STATUS, &success);
     if (!success) {
-        GLint log_len;
+        GLint log_len = 0;
         glGetShaderiv(shader, GL_INFO_LOG_LENGTH, &log_len);
-        char* log = (char*)malloc(log_len);
-        glGetShaderInfoLog(shader, log_len, nullptr, log);
-        LOGE("Shader compile error: %s", log);
-        free(log);
+        char* log = nullptr;
+        if (log_len > 0) {
+            log = (char*)malloc(log_len);
+            if (log) {
+                glGetShaderInfoLog(shader, log_len, nullptr, log);
+            }
+        }
+        LOGE("Shader compile error: %s", log ? log : "Unknown compilation error");
+        if (log) free(log);
         glDeleteShader(shader);
         return 0;
     }
@@ -43,12 +48,17 @@ GLuint kr_program_create(const char* vert_src, const char* frag_src) {
     GLint success;
     glGetProgramiv(program, GL_LINK_STATUS, &success);
     if (!success) {
-        GLint log_len;
+        GLint log_len = 0;
         glGetProgramiv(program, GL_INFO_LOG_LENGTH, &log_len);
-        char* log = (char*)malloc(log_len);
-        glGetProgramInfoLog(program, log_len, nullptr, log);
-        LOGE("Program linking error: %s", log);
-        free(log);
+        char* log = nullptr;
+        if (log_len > 0) {
+            log = (char*)malloc(log_len);
+            if (log) {
+                glGetProgramInfoLog(program, log_len, nullptr, log);
+            }
+        }
+        LOGE("Program linking error: %s", log ? log : "Unknown linking error");
+        if (log) free(log);
         glDeleteProgram(program);
         program = 0;
     }
